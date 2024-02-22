@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use clap::Parser;
+use half::{bf16, f16};
 use regex::Regex;
 use safetensors::{Dtype, View};
-use half::{bf16, f16};
-
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -143,8 +142,7 @@ fn main() -> candle_core::Result<()> {
             let name = rename(x.0);
             let shape = x.1.shape();
             let size: usize = shape.iter().product();
-        let bytes = size * x.1.tensor_type.size();
-
+            let bytes = size * x.1.tensor_type.size();
 
             println!("{}: [{:?}; {:?}]", name, x.1.shape(), x.1.dtype());
             Tensor { name, shape, data }

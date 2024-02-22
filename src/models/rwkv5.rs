@@ -82,7 +82,7 @@ struct SelfAttention {
 }
 
 impl SelfAttention {
-    pub fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
+    fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let hidden_size = cfg.hidden_size;
         let attn_hidden_size = cfg.attention_hidden_size;
         let key = linear(hidden_size, attn_hidden_size, vb.pp("key"))?;
@@ -121,7 +121,7 @@ impl SelfAttention {
         })
     }
 
-    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let h = self.time_decay.dim(0)?;
         let (b, t, s) = xs.dims3()?;
         let s = s / h;
@@ -195,7 +195,7 @@ struct FeedForward {
 }
 
 impl FeedForward {
-    pub fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
+    fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let int_size = cfg
             .intermediate_size
             .unwrap_or(((cfg.hidden_size as f64 * 3.5) as usize) / 32 * 32);
@@ -214,7 +214,7 @@ impl FeedForward {
         })
     }
 
-    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let shifted = &state.per_layer[self.layer_id].feed_forward;
         let key = (xs.broadcast_mul(&self.time_mix_key)?
             + shifted.broadcast_mul(&(1.0 - &self.time_mix_key)?)?)?;
@@ -239,7 +239,7 @@ struct Block {
 }
 
 impl Block {
-    pub fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
+    fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let ln1 = layer_norm(cfg.hidden_size, cfg.layer_norm_epsilon, vb.pp("ln1"))?;
         let ln2 = layer_norm(cfg.hidden_size, cfg.layer_norm_epsilon, vb.pp("ln2"))?;
         let pre_ln = if layer_id == 0 {
@@ -259,7 +259,7 @@ impl Block {
         })
     }
 
-    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let xs = match self.pre_ln.as_ref() {
             None => xs.clone(),
             Some(pre_ln) => xs.apply(pre_ln)?,
@@ -303,8 +303,12 @@ impl Model {
             layers_are_rescaled: false, // This seem to only happen for the f16/bf16 dtypes.
         })
     }
+}
 
-    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+impl crate::models::RwkvModule for Model {
+    type S = State;
+
+    fn forward(&self, xs: &Tensor, state: &mut Self::S) -> Result<Tensor> {
         let (_b_size, _seq_len) = xs.dims2()?;
         let mut xs = xs.apply(&self.embeddings)?;
         for (block_idx, block) in self.blocks.iter().enumerate() {

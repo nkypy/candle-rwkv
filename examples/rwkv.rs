@@ -2,13 +2,15 @@ use anyhow::Result;
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::generation::LogitsProcessor;
+use candle_transformers::quantized_var_builder::VarBuilder as QVarBuilder;
 use clap::Parser;
 
+use candle_rwkv::models::quantized::rwkv5::{Model as QModel, State as QState};
 use candle_rwkv::models::rwkv5::{Config, Model, State, Tokenizer};
+use candle_rwkv::models::RwkvModule;
 
-struct TextGeneration {
-    model: Model,
-    config: Config,
+struct TextGeneration<M: RwkvModule> {
+    model: M,
     device: Device,
     tokenizer: Tokenizer,
     logits_processor: LogitsProcessor,
@@ -16,11 +18,10 @@ struct TextGeneration {
     repeat_last_n: usize,
 }
 
-impl TextGeneration {
+impl<M: RwkvModule> TextGeneration<M> {
     #[allow(clippy::too_many_arguments)]
     fn new(
-        model: Model,
-        config: Config,
+        model: M,
         tokenizer: Tokenizer,
         seed: u64,
         temp: Option<f64>,
@@ -32,7 +33,6 @@ impl TextGeneration {
         let logits_processor = LogitsProcessor::new(seed, temp, top_p);
         Self {
             model,
-            config,
             tokenizer,
             logits_processor,
             repeat_penalty,
@@ -41,11 +41,10 @@ impl TextGeneration {
         }
     }
 
-    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<()> {
+    fn run(&mut self, prompt: &str, sample_len: usize, mut state: M::S) -> Result<()> {
         use std::io::Write;
         let mut tokens = self.tokenizer.encode(prompt)?;
         let mut generated_tokens = 0usize;
-        let mut state = State::new(1, &self.config, &self.device)?;
         let mut next_logits = None;
         for &t in tokens.iter() {
             let input = Tensor::new(&[[t]], &self.device)?;
@@ -94,11 +93,11 @@ impl TextGeneration {
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Run on CPU rather than on GPU.
-    #[arg(long)]
+    #[arg(long, default_value_t = true)]
     cpu: bool,
 
     #[arg(long)]
-    v5: bool,
+    v6: bool,
 
     #[arg(long)]
     quantized: bool,
@@ -111,11 +110,11 @@ struct Args {
     prompt: String,
 
     /// The temperature used to generate samples.
-    #[arg(long)]
+    #[arg(long, default_value = "1.0")]
     temperature: Option<f64>,
 
     /// Nucleus sampling probability cutoff.
-    #[arg(long)]
+    #[arg(long, default_value = "0.3")]
     top_p: Option<f64>,
 
     /// The seed to use when generating random samples.
@@ -123,17 +122,17 @@ struct Args {
     seed: u64,
 
     /// The length of the sample to generate (in tokens).
-    #[arg(long, short = 'n', default_value_t = 5000)]
+    #[arg(long, short = 'n', default_value_t = 333)]
     sample_len: usize,
 
     #[arg(long)]
-    tokenizer: Option<String>,
+    tokenizer: String,
 
     #[arg(long)]
-    weight_files: Option<String>,
+    weight_files: String,
 
     #[arg(long)]
-    config_file: Option<String>,
+    config_file: String,
 
     /// Penalty to be applied for repeating tokens, 1. means no penalty.
     #[arg(long, default_value_t = 1.1)]
@@ -154,13 +153,6 @@ fn main() -> Result<()> {
         tracing_subscriber::registry().with(chrome_layer).init();
         Some(guard)
     } else {
-        tracing_subscriber::fmt()
-            .event_format(
-                tracing_subscriber::fmt::format()
-                    .with_file(true)
-                    .with_line_number(true),
-            )
-            .init();
         None
     };
     println!(
@@ -179,42 +171,59 @@ fn main() -> Result<()> {
 
     let start = std::time::Instant::now();
 
-    let tokenizer = match args.tokenizer {
-        Some(file) => std::path::PathBuf::from(file),
-        None => panic!("no tolenizer"),
-    };
-    let config_filename = match args.config_file {
-        Some(file) => std::path::PathBuf::from(file),
-        None => panic!("config.json"),
-    };
-    let filenames = match args.weight_files {
-        Some(files) => files
-            .split(',')
-            .map(std::path::PathBuf::from)
-            .collect::<Vec<_>>(),
-        None => panic!("no weight files"),
-    };
+    let tokenizer = std::path::PathBuf::from(args.tokenizer);
+    let config_filename = std::path::PathBuf::from(args.config_file);
+    let filenames = args
+        .weight_files
+        .split(',')
+        .map(std::path::PathBuf::from)
+        .collect::<Vec<_>>();
     println!("retrieved the files in {:?}", start.elapsed());
     let tokenizer = Tokenizer::new(tokenizer)?;
 
     let start = std::time::Instant::now();
     let config: Config = serde_json::from_slice(&std::fs::read(config_filename)?)?;
-    let device = Device::Cpu;
-    let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, DType::F32, &device)? };
-    let model = dbg!(Model::new(&config, vb)?);
-    println!("loaded the model in {:?}", start.elapsed());
-
-    let mut pipeline = TextGeneration::new(
-        model,
-        config,
-        tokenizer,
-        args.seed,
-        args.temperature,
-        args.top_p,
-        args.repeat_penalty,
-        args.repeat_last_n,
-        &device,
-    );
-    pipeline.run(&args.prompt, args.sample_len)?;
+    let mut device = Device::Cpu;
+    if !args.cpu {
+        device = Device::new_cuda(0)?;
+    }
+    if !args.v6 {
+        if !args.quantized {
+            let vb =
+                unsafe { VarBuilder::from_mmaped_safetensors(&filenames, DType::F32, &device)? };
+            let model = Model::new(&config, vb)?;
+            println!("loaded the model in {:?}", start.elapsed());
+            let mut pipeline = TextGeneration::<Model>::new(
+                model,
+                tokenizer,
+                args.seed,
+                args.temperature,
+                args.top_p,
+                args.repeat_penalty,
+                args.repeat_last_n,
+                &device,
+            );
+            let state = State::new(1, &config, &device)?;
+            pipeline.run(&args.prompt, args.sample_len, state)?;
+        } else {
+            let vb = QVarBuilder::from_gguf(&args.weight_files, &device)?;
+            let model = QModel::new(&config, vb)?;
+            println!("loaded the model in {:?}", start.elapsed());
+            let mut pipeline = TextGeneration::<QModel>::new(
+                model,
+                tokenizer,
+                args.seed,
+                args.temperature,
+                args.top_p,
+                args.repeat_penalty,
+                args.repeat_last_n,
+                &device,
+            );
+            let state = QState::new(1, &config, &device)?;
+            pipeline.run(&args.prompt, args.sample_len, state)?;
+        }
+    } else {
+        // TODO: rwkv6
+    }
     Ok(())
 }

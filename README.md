@@ -2,10 +2,10 @@
 
 ### 进度
 
-- [x] RWKV v5
-- [ ] quantized RWKV v5
-- [x] RWKV v6
-- [ ] quantized RWKV v6
+- [x] RWKV5
+- [x] quantized RWKV5
+- [ ] RWKV6
+- [ ] quantized RWKV6
 
 ### 转换格式
 
@@ -29,11 +29,15 @@ cargo run --example quantize --release -- --input assets/RWKV-5-World-0.4B-v2-20
 ```bash
 # 示例
 
-# v6
-cargo run --example rwkv --release -- --weight-files assets/converted.st --config-file assets/config.json --tokenzier assets/rwkv_vocab_v20230424.json --prompt "User: 中国有多少个省？
-Assistant: "
+# rwkv6
+cargo run --example rwkv --release -- --v6 --weight-files converted6.st --config-file assets/config6.json --tokenizer assets/rwkv_vocab_v20230424.json --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 
-# v5 量化版
-cargo run --example rwkv --release -- --v5 --quantized --weight-files assets/converted.st --config-file assets/config.json --tokenzier assets/rwkv_vocab_v20230424.json --prompt "User: 中国有多少个省？
-Assistant: "
+# rwkv6 量化版
+cargo run --example rwkv --release -- --v6 --quantized --weight-files quantized6.gguf --config-file assets/config6.json --tokenizer assets/rwkv_vocab_v20230424.json --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+
+# rwkv5
+cargo run --example rwkv --release -- --weight-files converted5.st --config-file assets/config5.json --tokenizer assets/rwkv_vocab_v20230424.json --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+
+# rwkv5 量化版
+cargo run --example rwkv --release -- --quantized --weight-files quantized5.gguf --config-file assets/config5.json --tokenizer assets/rwkv_vocab_v20230424.json --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 ```
