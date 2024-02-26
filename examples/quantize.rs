@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use candle_core::quantized::gguf_file::Value;
-use candle_core::quantized::{gguf_file, GgmlDType, QTensor};
+use candle::quantized::gguf_file::Value;
+use candle::quantized::{gguf_file, GgmlDType, QTensor};
 use clap::Parser;
 use regex::Regex;
 
@@ -12,7 +12,7 @@ struct Args {
     input: String,
     #[arg(long)]
     config: String,
-    #[arg(long, default_value = "quantized.gguf")]
+    #[arg(long, default_value = "quantized-q4k.gguf")]
     output: String,
 }
 
@@ -83,10 +83,10 @@ fn rename(mut name: String) -> String {
     if name.ends_with(".time_maa_w2") {
         name = name.replace(".time_maa_w2", ".time_mix_w2");
     }
-    //  time_faaaa -> time_first and reshape
-    if name.ends_with(".time_faaaa") {
-        name = name.replace(".time_faaaa", ".time_first");
-    }
+    // //  time_faaaa -> time_first and reshape
+    // if name.ends_with(".time_faaaa") {
+    //     name = name.replace(".time_faaaa", ".time_first");
+    // }
 
     //  lora_A -> lora.0 and reshape
     if name.ends_with(".lora_A") {
@@ -105,10 +105,8 @@ fn rename(mut name: String) -> String {
 }
 
 #[inline]
-fn quantize(
-    tensors: Vec<(String, candle_core::Tensor)>,
-) -> candle_core::Result<Vec<(String, QTensor)>> {
-    let dtype = GgmlDType::Q4_0;
+fn quantize(tensors: Vec<(String, candle::Tensor)>) -> candle::Result<Vec<(String, QTensor)>> {
+    let dtype = GgmlDType::Q4K;
     let block_size = dtype.block_size();
 
     let qtensors = tensors
@@ -125,7 +123,7 @@ fn quantize(
             };
             Ok((name, tensor))
         })
-        .collect::<candle_core::Result<Vec<_>>>()?;
+        .collect::<candle::Result<Vec<_>>>()?;
 
     Ok(qtensors)
 }
@@ -137,14 +135,14 @@ fn metadata(config: String) -> Vec<(String, Value)> {
     metadata
 }
 
-fn main() -> candle_core::Result<()> {
+fn main() -> candle::Result<()> {
     let args = Args::parse();
 
     // read file to tensors
     println!("read pytorch file: {}", args.input);
-    let tensors = candle_core::safetensors::load(args.input, &candle_core::Device::Cpu)?;
+    let tensors = candle::safetensors::load(args.input, &candle::Device::Cpu)?;
     let mut tensors = tensors.into_iter().map(|(k, v)| (k, v)).collect::<Vec<_>>();
-    // let mut tensors = candle_core::pickle::read_all(args.input)?;
+    // let mut tensors = candle::pickle::read_all(args.input)?;
     tensors.sort_by(|a, b| a.0.cmp(&b.0));
 
     // save to gguf file

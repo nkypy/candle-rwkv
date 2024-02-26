@@ -1,161 +1,89 @@
-use candle_core::{DType, Device, IndexOp, Result, Tensor};
+use candle::{IndexOp, Result, Tensor};
 use candle_nn::{
     embedding, group_norm, layer_norm, linear_no_bias as linear, Embedding, LayerNorm, Linear,
     Module, VarBuilder,
 };
-use serde::Deserialize;
 
-fn default_num_attention_heads() -> usize {
-    64
-}
-
-// https://huggingface.co/RWKV/HF_v5-Eagle-7B/blob/main/configuration_rwkv5.py
-#[derive(Debug, Clone, Deserialize)]
-pub struct Config {
-    pub vocab_size: usize,
-    pub hidden_size: usize,
-    pub num_hidden_layers: usize,
-    pub attention_hidden_size: usize,
-    #[serde(default = "default_num_attention_heads")]
-    pub num_attention_heads: usize,
-    pub head_size: usize,
-    pub intermediate_size: Option<usize>,
-    pub layer_norm_epsilon: f64,
-    pub rescale_every: usize,
-}
-
-struct StatePerLayer {
-    extract_key_value: Tensor,
-    linear_attention: Tensor,
-    feed_forward: Tensor,
-}
-
-pub struct State {
-    per_layer: Vec<StatePerLayer>,
-    pos: usize,
-}
-
-impl State {
-    pub fn new(batch_size: usize, cfg: &Config, dev: &Device) -> Result<Self> {
-        let mut per_layer = Vec::with_capacity(cfg.num_hidden_layers);
-        // Certainly a weird convention but taken from modeling_rwkv5.py
-        let num_attention_heads = cfg.hidden_size / cfg.num_attention_heads;
-        for _layer_idx in 0..cfg.num_hidden_layers {
-            let extract_key_value = Tensor::zeros((batch_size, cfg.hidden_size), DType::F32, dev)?;
-            let linear_attention = Tensor::zeros(
-                (
-                    batch_size,
-                    num_attention_heads,
-                    cfg.hidden_size / num_attention_heads,
-                    cfg.hidden_size / num_attention_heads,
-                ),
-                DType::F32,
-                dev,
-            )?;
-            let feed_forward = Tensor::zeros((batch_size, cfg.hidden_size), DType::F32, dev)?;
-            per_layer.push(StatePerLayer {
-                extract_key_value,
-                linear_attention,
-                feed_forward,
-            });
-        }
-        Ok(Self { per_layer, pos: 0 })
-    }
-}
+pub use crate::models::rwkv5::{Config, State, Tokenizer};
 
 #[derive(Debug, Clone)]
-struct Attention {
-    time_decay: Tensor,
-    time_first: Tensor,
-
-    time_mix_x: Tensor,
-    time_mix_w: Tensor,
+struct SelfAttention {
+    key: Linear,
+    receptance: Linear,
+    value: Linear,
+    gate: Linear,
+    output: Linear,
+    ln_x: candle_nn::GroupNorm,
+    time_mix_x: Tensor, // v6
+    time_mix_w: Tensor, // v6
     time_mix_key: Tensor,
     time_mix_value: Tensor,
     time_mix_receptance: Tensor,
+    time_decay: Tensor,
+    time_first: Tensor,
     time_mix_gate: Tensor,
-
-    time_decay_w1: Linear,
-    time_decay_w2: Linear,
-    time_mix_w1: Linear,
-    time_mix_w2: Linear,
-
-    key: Linear,
-    value: Linear,
-    receptance: Linear,
-    gate: Linear,
-    output: Linear,
-
-    ln_x: candle_nn::GroupNorm,
-
+    time_decay_w1: Tensor, // v6
+    time_decay_w2: Tensor, // v6
+    time_mix_w1: Tensor,   // v6
+    time_mix_w2: Tensor,   // v6
     layer_id: usize,
     n_attn_heads: usize,
 }
 
-impl Attention {
-    pub fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
-        let n_attn_heads = cfg.hidden_size / cfg.head_size;
-        let time_decay = vb.get((n_attn_heads, cfg.head_size), "time_decay")?;
-        let time_first = vb.get((n_attn_heads, cfg.head_size), "time_first")?;
-
-        let time_mix_x = vb.get((1, 1, cfg.hidden_size), "time_mix_x")?;
-        let time_mix_w = vb.get((1, 1, cfg.hidden_size), "time_mix_w")?;
-        let time_mix_key = vb.get((1, 1, cfg.hidden_size), "time_mix_key")?;
-        let time_mix_value = vb.get((1, 1, cfg.hidden_size), "time_mix_value")?;
-        let time_mix_receptance = vb.get((1, 1, cfg.hidden_size), "time_mix_receptance")?;
-        let time_mix_gate = vb.get((1, 1, cfg.hidden_size), "time_mix_gate")?;
-
+impl SelfAttention {
+    fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let hidden_size = cfg.hidden_size;
         let attn_hidden_size = cfg.attention_hidden_size;
-
-        let time_decay_w1 = linear(hidden_size, attn_hidden_size, vb.pp("time_decay_w1"))?;
-        let time_decay_w2 = linear(hidden_size, attn_hidden_size, vb.pp("time_decay_w2"))?;
-        let time_mix_w1 = linear(hidden_size, attn_hidden_size, vb.pp("time_mix_w1"))?;
-        let time_mix_w2 = linear(hidden_size, attn_hidden_size, vb.pp("time_mix_w2"))?;
-
         let key = linear(hidden_size, attn_hidden_size, vb.pp("key"))?;
-        let value = linear(hidden_size, attn_hidden_size, vb.pp("value"))?;
         let receptance = linear(hidden_size, attn_hidden_size, vb.pp("receptance"))?;
+        let value = linear(hidden_size, attn_hidden_size, vb.pp("value"))?;
         let gate = linear(hidden_size, attn_hidden_size, vb.pp("gate"))?;
         let output = linear(attn_hidden_size, hidden_size, vb.pp("output"))?;
-
         let ln_x = group_norm(
             hidden_size / cfg.head_size,
             hidden_size,
             1e-5,
             vb.pp("ln_x"),
         )?;
-
+        let time_mix_x = vb.get((1, 1, cfg.hidden_size), "time_mix_x")?;
+        let time_mix_w = vb.get((1, 1, cfg.hidden_size), "time_mix_w")?;
+        let time_mix_key = vb.get((1, 1, cfg.hidden_size), "time_mix_key")?;
+        let time_mix_value = vb.get((1, 1, cfg.hidden_size), "time_mix_value")?;
+        let time_mix_receptance = vb.get((1, 1, cfg.hidden_size), "time_mix_receptance")?;
+        let n_attn_heads = cfg.hidden_size / cfg.head_size;
+        let time_decay = vb.get((1, 1, cfg.hidden_size), "time_decay")?;
+        let time_first = vb.get((n_attn_heads, cfg.head_size), "time_first")?;
+        let time_mix_gate = vb.get((1, 1, cfg.hidden_size), "time_mix_gate")?;
+        let time_decay_w1 = vb.get((cfg.hidden_size, n_attn_heads * 2), "time_decay_w1")?;
+        let time_decay_w2 = vb.get((n_attn_heads * 2, cfg.hidden_size), "time_decay_w2")?;
+        let time_mix_w1 = vb.get((cfg.hidden_size, n_attn_heads * 5), "time_mix_w1")?;
+        let time_mix_w2 = vb.get((5, n_attn_heads, cfg.hidden_size), "time_mix_w2")?;
         Ok(Self {
-            time_decay,
-            time_first,
-
-            time_mix_x,
-            time_mix_w,
-            time_mix_key,
-            time_mix_value,
-            time_mix_receptance,
-            time_mix_gate,
-
-            time_decay_w1,
-            time_decay_w2,
-            time_mix_w1,
-            time_mix_w2,
-
             key,
             value,
             receptance,
             gate,
             output,
-
+            time_decay_w1,
+            time_decay_w2,
+            time_mix_w1,
+            time_mix_w2,
             ln_x,
-
+            time_mix_x,
+            time_mix_w,
+            time_mix_key,
+            time_mix_value,
+            time_mix_receptance,
+            time_decay,
+            time_first,
+            time_mix_gate,
             layer_id,
             n_attn_heads,
         })
     }
 
-    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    // TODO:
+    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let h = self.time_decay.dim(0)?;
         let (b, t, s) = xs.dims3()?;
         let s = s / h;
@@ -222,39 +150,33 @@ impl Attention {
 struct FeedForward {
     time_mix_key: Tensor,
     time_mix_receptance: Tensor,
-
     key: Linear,
-    value: Linear,
     receptance: Linear,
-
+    value: Linear,
     layer_id: usize,
 }
 
 impl FeedForward {
-    pub fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
+    fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let int_size = cfg
             .intermediate_size
             .unwrap_or(((cfg.hidden_size as f64 * 3.5) as usize) / 32 * 32);
         let key = linear(cfg.hidden_size, int_size, vb.pp("key"))?;
-        let value = linear(int_size, cfg.hidden_size, vb.pp("value"))?;
         let receptance = linear(cfg.hidden_size, cfg.hidden_size, vb.pp("receptance"))?;
-
+        let value = linear(int_size, cfg.hidden_size, vb.pp("value"))?;
         let time_mix_key = vb.get((1, 1, cfg.hidden_size), "time_mix_key")?;
         let time_mix_receptance = vb.get((1, 1, cfg.hidden_size), "time_mix_receptance")?;
-
         Ok(Self {
+            key,
+            receptance,
+            value,
             time_mix_key,
             time_mix_receptance,
-
-            key,
-            value,
-            receptance,
-
             layer_id,
         })
     }
 
-    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let shifted = &state.per_layer[self.layer_id].feed_forward;
         let key = (xs.broadcast_mul(&self.time_mix_key)?
             + shifted.broadcast_mul(&(1.0 - &self.time_mix_key)?)?)?;
@@ -274,12 +196,12 @@ struct Block {
     pre_ln: Option<LayerNorm>,
     ln1: LayerNorm,
     ln2: LayerNorm,
-    attention: Attention,
+    attention: SelfAttention,
     feed_forward: FeedForward,
 }
 
 impl Block {
-    pub fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
+    fn new(layer_id: usize, cfg: &Config, vb: VarBuilder) -> Result<Self> {
         let ln1 = layer_norm(cfg.hidden_size, cfg.layer_norm_epsilon, vb.pp("ln1"))?;
         let ln2 = layer_norm(cfg.hidden_size, cfg.layer_norm_epsilon, vb.pp("ln2"))?;
         let pre_ln = if layer_id == 0 {
@@ -288,7 +210,7 @@ impl Block {
         } else {
             None
         };
-        let attention = Attention::new(layer_id, cfg, vb.pp("attention"))?;
+        let attention = SelfAttention::new(layer_id, cfg, vb.pp("attention"))?;
         let feed_forward = FeedForward::new(layer_id, cfg, vb.pp("feed_forward"))?;
         Ok(Self {
             pre_ln,
@@ -299,7 +221,7 @@ impl Block {
         })
     }
 
-    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let xs = match self.pre_ln.as_ref() {
             None => xs.clone(),
             Some(pre_ln) => xs.apply(pre_ln)?,

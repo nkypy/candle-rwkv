@@ -106,10 +106,10 @@ fn rename(mut name: String) -> String {
     if name.ends_with(".time_maa_w2") {
         name = name.replace(".time_maa_w2", ".time_mix_w2");
     }
-    //  time_faaaa -> time_first and reshape
-    if name.ends_with(".time_faaaa") {
-        name = name.replace(".time_faaaa", ".time_first");
-    }
+    // //  time_faaaa -> time_first and reshape
+    // if name.ends_with(".time_faaaa") {
+    //     name = name.replace(".time_faaaa", ".time_first");
+    // }
 
     //  lora_A -> lora.0 and reshape
     if name.ends_with(".lora_A") {
@@ -127,12 +127,12 @@ fn rename(mut name: String) -> String {
     name
 }
 
-fn main() -> candle_core::Result<()> {
+fn main() -> candle::Result<()> {
     let args = Args::parse();
 
     // read file to tensors
     println!("read pytorch file: {}", args.input);
-    let mut tensors = candle_core::pickle::read_all(args.input)?;
+    let mut tensors = candle::pickle::read_all(args.input)?;
     tensors.sort_by(|a, b| a.0.cmp(&b.0));
 
     // print and change name
@@ -148,7 +148,7 @@ fn main() -> candle_core::Result<()> {
             Tensor { name, shape, data }
             // (
             //     new_name,
-            //     x.1.to_dtype(candle_core::DType::F16)
+            //     x.1.to_dtype(candle::DType::F16)
             //         .unwrap()
             //         .contiguous()
             //         .unwrap(),
@@ -162,7 +162,7 @@ fn main() -> candle_core::Result<()> {
         (name, tensor)
     });
     safetensors::serialize_to_file(data, &None, &args.output)?;
-    candle_core::safetensors.save()?;
+    candle::safetensors.save()?;
     println!("converted to safetensors file: {}", args.output);
     Ok(())
 }

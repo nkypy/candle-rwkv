@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.4.0" }
-candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.4.0" }
-candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4.0" }
-serde = { version = "1.0.197", features = ["derive"] }
-serde_json = { version = "1.0.114" }
+candle = { git = "https://github.com/huggingface/candle.git", version = "0.4", package = "candle-core" }
+candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.4" }
+candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
 
 [dev-dependencies]
 anyhow = "1.0.80"
@@ -18,3 +18,4 @@ tracing-subscriber = "0.3.18"
 regex = "1.10.3"
 safetensors = "0.4.2"
 half = "2.3.1"
+hf-hub = { git = "https://github.com/nkypy/hf-hub.git" }
