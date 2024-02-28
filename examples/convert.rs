@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use candle::Tensor;
 use clap::Parser;
-use half::{bf16, f16};
 use regex::Regex;
-use safetensors::{Dtype, View};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -13,30 +12,6 @@ struct Args {
     input: String,
     #[arg(long, default_value = "model.safetensors")]
     output: String,
-}
-
-struct Tensor {
-    name: String,
-    shape: Vec<usize>,
-    data: Vec<f16>,
-}
-
-impl View for Tensor {
-    fn dtype(&self) -> Dtype {
-        Dtype::F16
-    }
-
-    fn shape(&self) -> &[usize] {
-        &self.shape
-    }
-
-    fn data(&self) -> Cow<[u8]> {
-        Cow::Borrowed(bytemuck::cast_slice(&self.data))
-    }
-
-    fn data_len(&self) -> usize {
-        self.data.len() * self.dtype().size()
-    }
 }
 
 #[inline]
@@ -80,7 +55,7 @@ fn rename(mut name: String) -> String {
     }
     //  time_maa_w -> time_mix_w and reshape
     if name.ends_with(".time_maa_w") {
-        name = name.replace(".time_maa_w", ".time_mix_w");
+        name = name.replace(".time_maa_w", ".time_mix_weight");
     }
     //  time_maa_k -> time_mix_key and reshape
     if name.ends_with(".time_maa_k") {
@@ -140,29 +115,20 @@ fn main() -> candle::Result<()> {
         .into_iter()
         .map(|x| {
             let name = rename(x.0);
-            let shape = x.1.shape();
-            let size: usize = shape.iter().product();
-            let bytes = size * x.1.tensor_type.size();
 
-            println!("{}: [{:?}; {:?}]", name, x.1.shape(), x.1.dtype());
-            Tensor { name, shape, data }
-            // (
-            //     new_name,
-            //     x.1.to_dtype(candle::DType::F16)
-            //         .unwrap()
-            //         .contiguous()
-            //         .unwrap(),
-            // )
+            let tensor =
+                x.1.to_dtype(candle::DType::F16)
+                    .unwrap()
+                    .contiguous()
+                    .unwrap();
+
+            println!("{}: [{:?}; {:?}]", name, tensor.shape(), tensor.dtype());
+            (name, tensor)
         })
-        .collect::<Vec<_>>();
+        .collect::<HashMap<String, Tensor>>();
 
-    // save to safetensors
-    let data = tensors.into_iter().map(|tensor| {
-        let name = tensor.name.clone();
-        (name, tensor)
-    });
-    safetensors::serialize_to_file(data, &None, &args.output)?;
-    candle::safetensors.save()?;
-    println!("converted to safetensors file: {}", args.output);
+    // save to safetensors file
+    candle::safetensors::save(&tensors, &args.output)?;
+    println!("converted to safetensors file: {}", &args.output);
     Ok(())
 }

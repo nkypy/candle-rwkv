@@ -286,9 +286,13 @@ fn main() -> Result<()> {
 
     let start = std::time::Instant::now();
     let config: Config = serde_json::from_slice(&std::fs::read(config_filename)?)?;
-    // TODO: candle example
-    // let device = candle_examples::device(args.cpu)?;
-    let device = Device::Cpu;
+    let device = if !args.cpu && candle::utils::cuda_is_available() {
+        Device::new_cuda(0)?
+    } else if !args.cpu && candle::utils::metal_is_available() {
+        Device::new_metal(0)?
+    } else {
+        Device::Cpu
+    };
     let model = if args.quantized {
         let filename = &filenames[0];
         let vb =
@@ -304,7 +308,7 @@ fn main() -> Result<()> {
             Which::World1b6 => Model::M6(M6::new(&config, vb)?),
         }
     };
-    println!("loaded the model in {:?}", start.elapsed());
+    println!("loaded the model on {:?} in {:?}", &device, start.elapsed());
 
     let mut pipeline = TextGeneration::new(
         model,

@@ -7,6 +7,8 @@ use candle_transformers::{
 
 pub use crate::models::rwkv5::{Config, State, Tokenizer};
 
+// Only time mixer changes for RWKV6
+
 #[derive(Debug, Clone)]
 struct SelfAttention {
     key: Linear,
@@ -15,12 +17,18 @@ struct SelfAttention {
     gate: Linear,
     output: Linear,
     ln_x: candle_nn::GroupNorm,
+    time_mix_x: Tensor,      // v6
+    time_mix_weight: Tensor, // v6
     time_mix_key: Tensor,
     time_mix_value: Tensor,
     time_mix_receptance: Tensor,
     time_decay: Tensor,
     time_faaaa: Tensor,
     time_mix_gate: Tensor,
+    time_decay_w1: Tensor, // v6
+    time_decay_w2: Tensor, // v6
+    time_mix_w1: Tensor,   // v6
+    time_mix_w2: Tensor,   // v6
     layer_id: usize,
     n_attn_heads: usize,
 }
@@ -47,6 +55,12 @@ impl SelfAttention {
             1e-5,
         )?;
 
+        let time_mix_x = vb
+            .get((1, 1, cfg.hidden_size), "time_mix_x")?
+            .dequantize(vb.device())?;
+        let time_mix_weight = vb
+            .get((1, 1, cfg.hidden_size), "time_mix_w")?
+            .dequantize(vb.device())?;
         let time_mix_key = vb
             .get((1, 1, cfg.hidden_size), "time_mix_key")?
             .dequantize(vb.device())?;
@@ -58,13 +72,25 @@ impl SelfAttention {
             .dequantize(vb.device())?;
         let n_attn_heads = cfg.hidden_size / cfg.head_size;
         let time_decay = vb
-            .get((n_attn_heads, cfg.head_size), "time_decay")?
+            .get((1, 1, cfg.hidden_size), "time_decay")?
             .dequantize(vb.device())?;
         let time_faaaa = vb
             .get((n_attn_heads, cfg.head_size), "time_faaaa")?
             .dequantize(vb.device())?;
         let time_mix_gate = vb
             .get((1, 1, cfg.hidden_size), "time_mix_gate")?
+            .dequantize(vb.device())?;
+        let time_decay_w1 = vb
+            .get((cfg.hidden_size, n_attn_heads * 2), "time_decay_w1")?
+            .dequantize(vb.device())?;
+        let time_decay_w2 = vb
+            .get((n_attn_heads * 2, cfg.hidden_size), "time_decay_w2")?
+            .dequantize(vb.device())?;
+        let time_mix_w1 = vb
+            .get((cfg.hidden_size, n_attn_heads * 5), "time_mix_w1")?
+            .dequantize(vb.device())?;
+        let time_mix_w2 = vb
+            .get((5, n_attn_heads, cfg.hidden_size), "time_mix_w2")?
             .dequantize(vb.device())?;
         Ok(Self {
             key,
@@ -73,22 +99,28 @@ impl SelfAttention {
             gate,
             output,
             ln_x,
+            time_mix_x,
+            time_mix_weight,
             time_mix_key,
             time_mix_value,
             time_mix_receptance,
             time_decay,
             time_faaaa,
             time_mix_gate,
+            time_decay_w1,
+            time_decay_w2,
+            time_mix_w1,
+            time_mix_w2,
             layer_id,
             n_attn_heads,
         })
     }
 
     pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
-        let h = self.time_decay.dim(0)?;
+        let h = self.n_attn_heads;
         let (b, t, s) = xs.dims3()?;
         let s = s / h;
-        let (receptance, key, value, gate) = {
+        let (receptance, key, value, gate, weight) = {
             // extract key-value
             let shifted = state.per_layer[self.layer_id].extract_key_value.clone();
             let shifted = if shifted.rank() == 2 {
@@ -96,32 +128,56 @@ impl SelfAttention {
             } else {
                 shifted
             };
-            let key = ((xs * &self.time_mix_key)? + &shifted * (1.0 - &self.time_mix_key)?)?;
-            let value = ((xs * &self.time_mix_value)? + &shifted * (1.0 - &self.time_mix_value)?)?;
-            let receptance = ((xs * &self.time_mix_receptance)?
-                + &shifted * (1.0 - &self.time_mix_receptance)?)?;
-            let gate = ((xs * &self.time_mix_gate)? + &shifted * (1.0 - &self.time_mix_gate)?)?;
 
-            let key = self.key.forward(&key)?;
-            let value = self.value.forward(&value)?;
-            let receptance = self.receptance.forward(&receptance)?;
-            let gate = candle_nn::ops::silu(&self.gate.forward(&gate)?)?;
+            let sx = (&shifted - xs)?;
+            let xxx = (xs + &sx * &self.time_mix_x)?;
+            let xxx = xxx
+                .broadcast_matmul(&self.time_mix_w1)?
+                .tanh()?
+                .reshape((5, 1, ()))?;
+
+            // dbg!(&xxx);
+            let xxx = xxx.broadcast_matmul(&self.time_mix_w2)?.reshape((5, ()))?;
+            // dbg!(&xxx);
+
+            let (mw, mk, mv, mr, mg) = (xxx.i(0)?, xxx.i(1)?, xxx.i(2)?, xxx.i(3)?, xxx.i(4)?);
+
+            let xw = (xs + &sx * (&self.time_mix_weight.broadcast_add(&mw)?))?;
+            let xk = (xs + &sx * (&self.time_mix_key.broadcast_add(&mk)?))?;
+            let xv = (xs + &sx * (&self.time_mix_value.broadcast_add(&mv)?))?;
+            let xr = (xs + &sx * (&self.time_mix_receptance.broadcast_add(&mr)?))?;
+            let xg = (xs + &sx * (&self.time_mix_gate.broadcast_add(&mg)?))?;
+
+            // dbg!(&xw, &xk, &xv, &xr, &xg);
+            let weight = (&self.time_decay
+                + xw.broadcast_matmul(&self.time_decay_w1)?
+                    .tanh()?
+                    .broadcast_matmul(&self.time_decay_w2)?)?;
+
+            // dbg!(&weight);
+
+            let key = self.key.forward(&xk)?;
+            let value = self.value.forward(&xv)?;
+            let receptance = self.receptance.forward(&xr)?;
+            let gate = candle_nn::ops::silu(&self.gate.forward(&xg)?)?;
             state.per_layer[self.layer_id].extract_key_value = xs.i((.., t - 1))?;
-            (receptance, key, value, gate)
+            (receptance, key, value, gate, weight)
         };
+        // dbg!(&xs, &receptance, &key, &value, &gate, &weight);
         // linear attention
         let mut state_ = state.per_layer[self.layer_id].linear_attention.clone();
         let key = key.reshape((b, t, h, s))?.permute((0, 2, 3, 1))?;
         let value = value.reshape((b, t, h, s))?.transpose(1, 2)?;
         let receptance = receptance.reshape((b, t, h, s))?.transpose(1, 2)?;
 
-        let time_decay = self
-            .time_decay
-            .exp()?
-            .neg()?
-            .exp()?
-            .reshape(((), 1, 1))?
-            .reshape((self.n_attn_heads, (), 1))?;
+        let weight =
+            weight
+                .exp()?
+                .neg()?
+                .exp()?
+                .reshape(((), 1, 1))?
+                .reshape((self.n_attn_heads, (), 1))?;
+
         let time_faaaa =
             self.time_faaaa
                 .reshape(((), 1, 1))?
@@ -135,7 +191,7 @@ impl SelfAttention {
             let at = kt.matmul(&vt)?;
             let rhs = (time_faaaa.broadcast_mul(&at)? + &state_)?;
             let out_ = rt.matmul(&rhs)?.squeeze(2)?;
-            state_ = (&at + time_decay.broadcast_mul(&state_))?;
+            state_ = (&at + weight.broadcast_mul(&state_))?;
             out.push(out_)
         }
         let out = Tensor::cat(&out, 1)?.reshape((b * t, h * s, 1))?;
