@@ -1,10 +1,11 @@
 /target
 
+/assets
+*.bin
 *.pth
 *.st
 *.safetensors
 *.gguf
-config*.json
 
 
 # General
