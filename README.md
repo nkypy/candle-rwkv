@@ -4,13 +4,15 @@
 
 - [x] RWKV5
 - [x] quantized RWKV5
-- [ ] RWKV6
-- [ ] quantized RWKV6
+- [x] RWKV6
+- [x] quantized RWKV6
+- [ ] RWKV7
+- [ ] quantized RWKV7
 
-### PR
+### PRs
 
 - RWKV5 [#1743](https://github.com/huggingface/candle/pull/1743)
-- RWKV6 [#TODO](https://github.com/huggingface/candle/pull/TODO)
+- RWKV6 [#1781](https://github.com/huggingface/candle/pull/1781)
 
 ### 运行
 
