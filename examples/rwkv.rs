@@ -17,8 +17,6 @@ use candle_rwkv::models::quantized::rwkv6::Model as Q6;
 use candle_rwkv::models::rwkv5::{Config, Model as M5, State, Tokenizer};
 use candle_rwkv::models::rwkv6::Model as M6;
 
-const EOS_TOKEN_ID: u32 = 261;
-
 enum Model {
     M5(M5),
     Q5(Q5),
@@ -86,6 +84,8 @@ impl TextGeneration {
         }
         std::io::stdout().flush()?;
 
+        let mut last = "".to_string();
+
         let start_gen = std::time::Instant::now();
         for _ in 0..sample_len {
             let logits = match next_logits.as_ref() {
@@ -104,12 +104,20 @@ impl TextGeneration {
                 )?
             };
             let next_token = self.logits_processor.sample(&logits)?;
+            println!("{}", next_token);
             tokens.push(next_token);
             generated_tokens += 1;
-            if next_token == EOS_TOKEN_ID || next_token == 0 {
+            if next_token == 261 || next_token == 0 {
                 break;
             }
-            print!("{}", self.tokenizer.decode(&[next_token])?);
+            if next_token == 11 {
+                if last.chars().last() == Some('\n') {
+                    break;
+                };
+            }
+            let cur = self.tokenizer.decode(&[next_token])?;
+            print!("{}", cur);
+            last = cur;
             std::io::stdout().flush()?;
 
             let input = Tensor::new(&[[next_token]], &self.device)?;
