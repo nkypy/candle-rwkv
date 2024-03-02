@@ -104,7 +104,6 @@ impl TextGeneration {
                 )?
             };
             let next_token = self.logits_processor.sample(&logits)?;
-            println!("{}", next_token);
             tokens.push(next_token);
             generated_tokens += 1;
             if next_token == 261 || next_token == 0 {
