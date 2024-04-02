@@ -281,13 +281,13 @@ fn main() -> Result<()> {
                     Which::World1b5 => api
                         .model("lmz/candle-rwkv".to_string())
                         .get("world1b5-q4k.gguf")?,
-                    Which::World1b6 => repo.get("rwkv-6-world-1b6-q4k.gguf")?,
+                    Which::World1b6 => repo.get("RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf")?,
                 };
                 vec![file]
             } else {
                 let file = match args.which {
                     Which::World1b5 => repo.get("model.safetensors")?,
-                    Which::World1b6 => repo.get("rwkv-6-world-1b6.safetensors")?,
+                    Which::World1b6 => repo.get("RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors")?,
                 };
                 vec![file]
             }
