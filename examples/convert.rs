@@ -1,9 +1,10 @@
-use std::borrow::Cow;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File};
 
-use candle::Tensor;
 use clap::Parser;
+use half::{bf16, f16};
+use memmap2::Mmap;
 use regex::Regex;
+use repugnant_pickle::RepugnantTorchTensors;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -55,7 +56,7 @@ fn rename(mut name: String) -> String {
     }
     //  time_maa_w -> time_mix_w and reshape
     if name.ends_with(".time_maa_w") {
-        name = name.replace(".time_maa_w", ".time_mix_weight");
+        name = name.replace(".time_maa_w", ".time_mix_w");
     }
     //  time_maa_k -> time_mix_key and reshape
     if name.ends_with(".time_maa_k") {
@@ -102,31 +103,33 @@ fn rename(mut name: String) -> String {
     name
 }
 
-fn main() -> candle::Result<()> {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // read file to tensors
-    println!("read pytorch file: {}", args.input);
-    let mut tensors = candle::pickle::read_all(args.input)?;
-    tensors.sort_by(|a, b| a.0.cmp(&b.0));
+    println!("reading model file: {}", &args.input);
 
-    // print and change name
+    let tensors = RepugnantTorchTensors::new_from_file(&args.input)?;
+
+    let file = File::open(args.input)?;
+    let data = unsafe { Mmap::map(&file)? };
+
     let tensors = tensors
         .into_iter()
         .map(|x| {
-            let name = rename(x.0);
+            let name = rename(x.name);
 
-            let tensor =
-                x.1.to_dtype(candle::DType::F16)
-                    .unwrap()
-                    .contiguous()
-                    .unwrap();
+            let start = x.absolute_offset as usize;
+            let end = start + x.shape.iter().product::<usize>() * x.tensor_type.size();
 
+            let data: &[bf16] = bytemuck::cast_slice(&data[start..end]);
+            let data: Vec<_> = data.iter().map(|x| f16::from_f32(x.to_f32())).collect();
+
+            let tensor = candle::Tensor::from_vec(data, x.shape, &candle::Device::Cpu).unwrap();
             println!("{}: [{:?}; {:?}]", name, tensor.shape(), tensor.dtype());
             (name, tensor)
         })
-        .collect::<HashMap<String, Tensor>>();
-
+        .collect::<HashMap<String, candle::Tensor>>();
     // save to safetensors file
     candle::safetensors::save(&tensors, &args.output)?;
     println!("converted to safetensors file: {}", &args.output);

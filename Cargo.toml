@@ -16,6 +16,13 @@ serde_json = { version = "1.0" }
 anyhow = { version = "1.0" }
 regex = { version = "1.10" }
 hf-hub = { git = "https://github.com/nkypy/hf-hub.git" }
+candle-datasets = { git = "https://github.com/huggingface/candle.git" }
+memmap2 = "0.9.4"
+rand = "0.8.5"
+byteorder = "1.5.0"
+half = "2.4.0"
+bytemuck = "1.15.0"
+repugnant-pickle = { version = "0.0.1", features = ["torch"] }
 
 [features]
 default = []

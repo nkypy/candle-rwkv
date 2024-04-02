@@ -17,6 +17,12 @@
 ### Examples
 
 ```bash
+# convert pth to safetensors
+cargo run --release --example convert -- --input RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
+
+# quantize pth to gguf
+cargo run --release --example quantize -- --input RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
+
 # rwkv6
 cargo run --example rwkv --release -- --which "world1b6" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 
