@@ -6,6 +6,7 @@
 *.st
 *.safetensors
 *.gguf
+*.py
 
 
 # General

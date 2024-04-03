@@ -1,5 +1,6 @@
 use core::fmt;
 use std::fs::File;
+use std::path::PathBuf;
 
 use candle::quantized::{
     gguf_file::{self, Value},
@@ -130,7 +131,7 @@ fn main() -> anyhow::Result<()> {
     println!("reading model file: {}", &args.input);
     let tensors = RepugnantTorchTensors::new_from_file(&args.input)?;
 
-    let file = File::open(args.input)?;
+    let file = File::open(&args.input)?;
     let data = unsafe { Mmap::map(&file)? };
 
     let tensors = tensors
@@ -168,7 +169,13 @@ fn main() -> anyhow::Result<()> {
 
     let output = match &args.output {
         Some(n) => n.to_owned(),
-        None => format!("quantized-{}.gguf", args.quantization),
+        None => {
+            let mut path = PathBuf::from(&args.input);
+            path.set_extension("");
+            path.as_mut_os_string()
+                .push(format!("-{}.gguf", args.quantization));
+            path.to_str().unwrap().to_owned()
+        }
     };
     let mut out_file = std::fs::File::create(&output)?;
     gguf_file::write(&mut out_file, &metadata, &qtensors)?;

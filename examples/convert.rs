@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, fs::File, path::PathBuf};
 
 use clap::Parser;
 use half::{bf16, f16};
@@ -11,8 +11,8 @@ use repugnant_pickle::RepugnantTorchTensors;
 struct Args {
     #[arg(long)]
     input: String,
-    #[arg(long, default_value = "model.safetensors")]
-    output: String,
+    #[arg(long)]
+    output: Option<String>,
 }
 
 #[inline]
@@ -111,7 +111,7 @@ fn main() -> anyhow::Result<()> {
 
     let tensors = RepugnantTorchTensors::new_from_file(&args.input)?;
 
-    let file = File::open(args.input)?;
+    let file = File::open(&args.input)?;
     let data = unsafe { Mmap::map(&file)? };
 
     let tensors = tensors
@@ -126,12 +126,19 @@ fn main() -> anyhow::Result<()> {
             let data: Vec<_> = data.iter().map(|x| f16::from_f32(x.to_f32())).collect();
 
             let tensor = candle::Tensor::from_vec(data, x.shape, &candle::Device::Cpu).unwrap();
-            println!("{}: [{:?}; {:?}]", name, tensor.shape(), tensor.dtype());
+            println!("  {}: [{:?}; {:?}]", name, tensor.shape(), tensor.dtype());
             (name, tensor)
         })
         .collect::<HashMap<String, candle::Tensor>>();
+    let output = if let Some(output) = args.output {
+        output
+    } else {
+        let mut path = PathBuf::from(&args.input);
+        path.set_extension("safetensors");
+        path.to_str().unwrap().to_owned()
+    };
     // save to safetensors file
-    candle::safetensors::save(&tensors, &args.output)?;
-    println!("converted to safetensors file: {}", &args.output);
+    candle::safetensors::save(&tensors, &output)?;
+    println!("converted to safetensors file: {}", output);
     Ok(())
 }
