@@ -393,8 +393,8 @@ dependencies = [
 
 [[package]]
 name = "candle-core"
-version = "0.4.2"
-source = "git+https://github.com/huggingface/candle.git#08c049def36a8df4bd6d7231a62b1e342fcc9a65"
+version = "0.5.0"
+source = "git+https://github.com/huggingface/candle.git#33c9b6655459bd1086574cef9ba8f2e72a8804c8"
 dependencies = [
  "byteorder",
  "candle-kernels",
@@ -417,8 +417,8 @@ dependencies = [
 
 [[package]]
 name = "candle-datasets"
-version = "0.4.2"
-source = "git+https://github.com/huggingface/candle.git#08c049def36a8df4bd6d7231a62b1e342fcc9a65"
+version = "0.5.0"
+source = "git+https://github.com/huggingface/candle.git#33c9b6655459bd1086574cef9ba8f2e72a8804c8"
 dependencies = [
  "byteorder",
  "candle-core",
@@ -434,16 +434,16 @@ dependencies = [
 
 [[package]]
 name = "candle-kernels"
-version = "0.4.2"
-source = "git+https://github.com/huggingface/candle.git#08c049def36a8df4bd6d7231a62b1e342fcc9a65"
+version = "0.5.0"
+source = "git+https://github.com/huggingface/candle.git#33c9b6655459bd1086574cef9ba8f2e72a8804c8"
 dependencies = [
  "bindgen_cuda",
 ]
 
 [[package]]
 name = "candle-metal-kernels"
-version = "0.4.2"
-source = "git+https://github.com/huggingface/candle.git#08c049def36a8df4bd6d7231a62b1e342fcc9a65"
+version = "0.5.0"
+source = "git+https://github.com/huggingface/candle.git#33c9b6655459bd1086574cef9ba8f2e72a8804c8"
 dependencies = [
  "metal",
  "once_cell",
@@ -453,8 +453,8 @@ dependencies = [
 
 [[package]]
 name = "candle-nn"
-version = "0.4.2"
-source = "git+https://github.com/huggingface/candle.git#08c049def36a8df4bd6d7231a62b1e342fcc9a65"
+version = "0.5.0"
+source = "git+https://github.com/huggingface/candle.git#33c9b6655459bd1086574cef9ba8f2e72a8804c8"
 dependencies = [
  "candle-core",
  "candle-metal-kernels",
@@ -492,8 +492,8 @@ dependencies = [
 
 [[package]]
 name = "candle-transformers"
-version = "0.4.2"
-source = "git+https://github.com/huggingface/candle.git#08c049def36a8df4bd6d7231a62b1e342fcc9a65"
+version = "0.5.0"
+source = "git+https://github.com/huggingface/candle.git#33c9b6655459bd1086574cef9ba8f2e72a8804c8"
 dependencies = [
  "byteorder",
  "candle-core",
@@ -1116,9 +1116,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.12"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "190092ea657667030ac6a35e305e62fc4dd69fd98ac98631e5d3a2b1575a12b5"
+checksum = "a06fddc2749e0528d2813f95e050e87e52c8cbbae56223b9babf73b3e53b0cc6"
 dependencies = [
  "cfg-if",
  "libc",
@@ -1133,9 +1133,9 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "half"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5eceaaeec696539ddaf7b333340f1af35a5aa87ae3e4f3ead0532f72affab2e"
+checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
 dependencies = [
  "bytemuck",
  "cfg-if",
