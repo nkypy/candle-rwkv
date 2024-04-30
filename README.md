@@ -18,10 +18,10 @@ If you just want to have a try. Run command below.
 
 ```bash
 # run rwkv6
-cargo run --release --example rwkv -- --which "world1b6" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --which "world6-3b" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 
 # run quantized rwkv6
-cargo run --release --example rwkv -- --quantized --which "world1b6" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --quantized --which "world6-3b" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 
 # run rwkv5
 cargo run --release --example rwkv -- --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
@@ -36,7 +36,7 @@ If you want to use local model file. First, download pth file from [Hugging Face
 # convert pth to safetensors
 cargo run --release --example convert -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
 # run rwkv6
-cargo run --release --example rwkv -- --which "world1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 
 
 # quanzited model
@@ -44,7 +44,7 @@ cargo run --release --example rwkv -- --which "world1b6" --weight-files ./RWKV-x
 # quantize pth to gguf
 cargo run --release --example quantize -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
 # run quantized rwkv6
-cargo run --release --example rwkv -- --quantized --which "world1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --quantized --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 ```
 
 ### Others

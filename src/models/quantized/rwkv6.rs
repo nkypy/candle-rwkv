@@ -79,16 +79,16 @@ impl SelfAttention {
             .get((1, 1, cfg.hidden_size), "time_mix_gate")?
             .dequantize(vb.device())?;
         let time_decay_w1 = vb
-            .get((cfg.hidden_size, n_attn_heads * 2), "time_decay_w1")?
+            .get((cfg.hidden_size, cfg.head_size), "time_decay_w1")?
             .dequantize(vb.device())?;
         let time_decay_w2 = vb
-            .get((n_attn_heads * 2, cfg.hidden_size), "time_decay_w2")?
+            .get((cfg.head_size, cfg.hidden_size), "time_decay_w2")?
             .dequantize(vb.device())?;
         let time_mix_w1 = vb
-            .get((cfg.hidden_size, n_attn_heads * 5), "time_mix_w1")?
+            .get((cfg.hidden_size, cfg.head_size * 5 / 2), "time_mix_w1")?
             .dequantize(vb.device())?;
         let time_mix_w2 = vb
-            .get((5, n_attn_heads, cfg.hidden_size), "time_mix_w2")?
+            .get((5, cfg.head_size / 2, cfg.hidden_size), "time_mix_w2")?
             .dequantize(vb.device())?;
         Ok(Self {
             key,

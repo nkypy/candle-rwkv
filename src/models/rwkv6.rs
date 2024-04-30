@@ -61,10 +61,10 @@ impl SelfAttention {
         let time_decay = vb.get((1, 1, cfg.hidden_size), "time_decay")?;
         let time_faaaa = vb.get((n_attn_heads, cfg.head_size), "time_faaaa")?;
         let time_mix_gate = vb.get((1, 1, cfg.hidden_size), "time_mix_gate")?;
-        let time_decay_w1 = vb.get((cfg.hidden_size, n_attn_heads * 2), "time_decay_w1")?;
-        let time_decay_w2 = vb.get((n_attn_heads * 2, cfg.hidden_size), "time_decay_w2")?;
-        let time_mix_w1 = vb.get((cfg.hidden_size, n_attn_heads * 5), "time_mix_w1")?;
-        let time_mix_w2 = vb.get((5, n_attn_heads, cfg.hidden_size), "time_mix_w2")?;
+        let time_decay_w1 = vb.get((cfg.hidden_size, cfg.head_size), "time_decay_w1")?;
+        let time_decay_w2 = vb.get((cfg.head_size, cfg.hidden_size), "time_decay_w2")?;
+        let time_mix_w1 = vb.get((cfg.hidden_size, cfg.head_size * 5 / 2), "time_mix_w1")?;
+        let time_mix_w2 = vb.get((5, cfg.head_size / 2, cfg.hidden_size), "time_mix_w2")?;
         Ok(Self {
             key,
             value,

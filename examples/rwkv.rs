@@ -134,7 +134,8 @@ impl TextGeneration {
 #[derive(Parser, ValueEnum, Clone, Copy, PartialEq, Eq, Debug)]
 enum Which {
     World1b5,
-    World1b6,
+    World6_1b6,
+    World6_3b,
 }
 
 impl std::fmt::Display for Which {
@@ -147,14 +148,16 @@ impl Which {
     fn model_id(&self) -> &'static str {
         match self {
             Self::World1b5 => "RWKV/rwkv-5-world-1b5",
-            Self::World1b6 => "paperfun/rwkv",
+            Self::World6_1b6 => "paperfun/rwkv",
+            Self::World6_3b => "paperfun/rwkv",
         }
     }
 
     fn revision(&self) -> &'static str {
         match self {
             Self::World1b5 => "refs/pr/2",
-            Self::World1b6 => "main",
+            Self::World6_1b6 => "main",
+            Self::World6_3b => "main",
         }
     }
 }
@@ -262,13 +265,16 @@ fn main() -> Result<()> {
     };
     let config_filename = match args.config_file {
         Some(file) => std::path::PathBuf::from(file),
-        None => api
-            .repo(Repo::with_revision(
-                "RWKV/rwkv-5-world-1b5".to_string(),
-                RepoType::Model,
-                "refs/pr/2".to_string(),
-            ))
-            .get("config.json")?,
+        None => match args.which {
+            Which::World1b5 | Which::World6_1b6 => api
+                .repo(Repo::with_revision(
+                    "RWKV/rwkv-5-world-1b5".to_string(),
+                    RepoType::Model,
+                    "refs/pr/2".to_string(),
+                ))
+                .get("config.json")?,
+            Which::World6_3b => repo.get("config_3b.json")?,
+        },
     };
     let filenames = match args.weight_files {
         Some(files) => files
@@ -281,13 +287,23 @@ fn main() -> Result<()> {
                     Which::World1b5 => api
                         .model("lmz/candle-rwkv".to_string())
                         .get("world1b5-q4k.gguf")?,
-                    Which::World1b6 => repo.get("RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf")?,
+                    Which::World6_1b6 => {
+                        repo.get("RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf")?
+                    }
+                    Which::World6_3b => {
+                        repo.get("RWKV-x060-World-3B-v2.1-20240417-ctx4096-q4k.gguf")?
+                    }
                 };
                 vec![file]
             } else {
                 let file = match args.which {
                     Which::World1b5 => repo.get("model.safetensors")?,
-                    Which::World1b6 => repo.get("RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors")?,
+                    Which::World6_1b6 => {
+                        repo.get("RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors")?
+                    }
+                    Which::World6_3b => {
+                        repo.get("RWKV-x060-World-3B-v2.1-20240417-ctx4096.safetensors")?
+                    }
                 };
                 vec![file]
             }
@@ -311,13 +327,13 @@ fn main() -> Result<()> {
             candle_transformers::quantized_var_builder::VarBuilder::from_gguf(filename, &device)?;
         match args.which {
             Which::World1b5 => Model::Q5(Q5::new(&config, vb)?),
-            Which::World1b6 => Model::Q6(Q6::new(&config, vb)?),
+            Which::World6_1b6 | Which::World6_3b => Model::Q6(Q6::new(&config, vb)?),
         }
     } else {
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, DType::F32, &device)? };
         match args.which {
             Which::World1b5 => Model::M5(M5::new(&config, vb)?),
-            Which::World1b6 => Model::M6(M6::new(&config, vb)?),
+            Which::World6_1b6 | Which::World6_3b => Model::M6(M6::new(&config, vb)?),
         }
     };
     println!("loaded the model on {:?} in {:?}", &device, start.elapsed());
