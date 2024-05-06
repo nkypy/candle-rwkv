@@ -7,6 +7,10 @@ edition = "2021"
 candle = { git = "https://github.com/huggingface/candle.git", package = "candle-core" }
 candle-nn = { git = "https://github.com/huggingface/candle.git" }
 candle-transformers = { git = "https://github.com/huggingface/candle.git" }
+intel-mkl-src = { version = "0.8", features = [
+    "mkl-static-lp64-iomp",
+], optional = true }
+accelerate-src = { version = "0.3", optional = true }
 
 [dev-dependencies]
 clap = { version = "4.5", features = ["derive"] }
@@ -26,5 +30,17 @@ repugnant-pickle = { version = "0.0.1", features = ["torch"] }
 
 [features]
 default = []
+accelerate = [
+    "dep:accelerate-src",
+    "candle/accelerate",
+    "candle-nn/accelerate",
+    "candle-transformers/accelerate",
+]
 cuda = ["candle/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+mkl = [
+    "dep:intel-mkl-src",
+    "candle/mkl",
+    "candle-nn/mkl",
+    "candle-transformers/mkl",
+]
 metal = ["candle/metal", "candle-nn/metal"]
