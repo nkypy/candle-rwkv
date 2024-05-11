@@ -21,7 +21,7 @@ struct Args {
     config: Option<String>,
     #[arg(long)]
     output: Option<String>,
-    #[arg(long, default_value = "q4k")]
+    #[arg(long, default_value = "q4_k_m")]
     quantization: Quantization,
 }
 
@@ -37,35 +37,43 @@ enum Quantization {
     Q5_1,
     #[value(name = "q8_0")]
     Q8_0,
-    #[value(name = "q8_1")]
-    Q8_1,
-    Q2k,
-    Q3k,
-    Q4k,
-    Q5k,
-    Q6k,
-    Q8k,
-    F16,
-    F32,
+    #[value(name = "q2_k")]
+    Q2K,
+    #[value(name = "q3_k_s")]
+    Q3KS,
+    #[value(name = "q3_k_m")]
+    Q3KM,
+    #[value(name = "q3_k_l")]
+    Q3KL,
+    #[value(name = "q4_k_s")]
+    Q4KS,
+    #[value(name = "q4_k_m")]
+    Q4KM,
+    #[value(name = "q5_k_s")]
+    Q5KS,
+    #[value(name = "q5_k_m")]
+    Q5KM,
+    #[value(name = "q6_k")]
+    Q6K,
 }
 
 impl fmt::Display for Quantization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let q = match self {
-            Self::Q4_0 => "q4_0",
-            Self::Q4_1 => "q4_1",
-            Self::Q5_0 => "q5_0",
-            Self::Q5_1 => "q5_1",
-            Self::Q8_0 => "q8_0",
-            Self::Q8_1 => "q8_1",
-            Self::Q2k => "q2k",
-            Self::Q3k => "q3k",
-            Self::Q4k => "q4k",
-            Self::Q5k => "q5k",
-            Self::Q6k => "q6k",
-            Self::Q8k => "q8k",
-            Self::F16 => "f16",
-            Self::F32 => "f32",
+            Self::Q4_0 => "Q4_0",
+            Self::Q4_1 => "Q4_1",
+            Self::Q5_0 => "Q5_0",
+            Self::Q5_1 => "Q5_1",
+            Self::Q8_0 => "Q8_0",
+            Self::Q2K => "Q2_K",
+            Self::Q3KS => "Q3_K_S",
+            Self::Q3KM => "Q3_K_M",
+            Self::Q3KL => "Q3_K_L",
+            Self::Q4KS => "Q4_K_S",
+            Self::Q4KM => "Q4_K_M",
+            Self::Q5KS => "Q5_K_S",
+            Self::Q5KM => "Q5_K_M",
+            Self::Q6K => "Q6_K",
         };
         write!(f, "{}", q)
     }
@@ -79,15 +87,11 @@ impl Quantization {
             Self::Q5_0 => GgmlDType::Q5_0,
             Self::Q5_1 => GgmlDType::Q5_1,
             Self::Q8_0 => GgmlDType::Q8_0,
-            Self::Q8_1 => GgmlDType::Q8_1,
-            Self::Q2k => GgmlDType::Q2K,
-            Self::Q3k => GgmlDType::Q3K,
-            Self::Q4k => GgmlDType::Q4K,
-            Self::Q5k => GgmlDType::Q5K,
-            Self::Q6k => GgmlDType::Q6K,
-            Self::Q8k => GgmlDType::Q8K,
-            Self::F16 => GgmlDType::F16,
-            Self::F32 => GgmlDType::F32,
+            Self::Q2K => GgmlDType::Q2K,
+            Self::Q3KS | Self::Q3KM | Self::Q3KL => GgmlDType::Q3K,
+            Self::Q4KS | Self::Q4KM => GgmlDType::Q4K,
+            Self::Q5KS | Self::Q5KM => GgmlDType::Q5K,
+            Self::Q6K => GgmlDType::Q6K,
         }
     }
 }
@@ -102,10 +106,14 @@ fn quantize(
     let qtensors = tensors
         .into_iter()
         .map(|(name, tensor)| {
-            let should_quantize = tensor.rank() == 2 && tensor.dim(1)? % block_size == 0;
+            let should_quantize = tensor.rank() >= 2 && tensor.dim(1)? % block_size == 0;
             println!("  quantizing {name} {tensor:?} {should_quantize}");
             let tensor = if should_quantize {
-                QTensor::quantize(&tensor, dtype)?
+                if name == "head.weight" && dtype != GgmlDType::Q8_0 {
+                    QTensor::quantize(&tensor, GgmlDType::Q6K)?
+                } else {
+                    QTensor::quantize(&tensor, dtype)?
+                }
             } else {
                 QTensor::quantize(&tensor, GgmlDType::F32)?
             };
@@ -127,8 +135,22 @@ fn metadata(_config: String) -> Vec<(String, Value)> {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    let output = match &args.output {
+        Some(n) => n.to_owned(),
+        None => {
+            let mut path = PathBuf::from(&args.input);
+            path.set_extension("");
+            path.as_mut_os_string()
+                .push(format!(".{}.gguf", args.quantization));
+            path.to_str().unwrap().to_owned()
+        }
+    };
+
     // read file to tensors
-    println!("reading model file: {}", &args.input);
+    println!(
+        "main: quantizing '{}' to '{}' as {}",
+        &args.input, &output, &args.quantization
+    );
     let tensors = RepugnantTorchTensors::new_from_file(&args.input)?;
 
     let file = File::open(&args.input)?;
@@ -167,16 +189,6 @@ fn main() -> anyhow::Result<()> {
         .map(|(k, v)| (k.as_str(), v))
         .collect::<Vec<_>>();
 
-    let output = match &args.output {
-        Some(n) => n.to_owned(),
-        None => {
-            let mut path = PathBuf::from(&args.input);
-            path.set_extension("");
-            path.as_mut_os_string()
-                .push(format!("-{}.gguf", args.quantization));
-            path.to_str().unwrap().to_owned()
-        }
-    };
     let mut out_file = std::fs::File::create(&output)?;
     gguf_file::write(&mut out_file, &metadata, &qtensors)?;
     println!("quantized to gguf file: {}", &output);
