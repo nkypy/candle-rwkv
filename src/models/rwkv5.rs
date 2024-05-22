@@ -3,6 +3,7 @@ use candle_nn::{
     embedding, layer_norm, linear_no_bias as linear, Embedding, LayerNorm, Linear, Module,
     VarBuilder,
 };
+use candle_transformers::quantized_var_builder::VarBuilder as QVarBuilder;
 use std::collections::{HashMap, HashSet};
 
 fn default_num_attention_heads() -> usize {
@@ -36,22 +37,93 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(batch_size: usize, cfg: &Config, dev: &Device) -> Result<Self> {
+    pub fn new(
+        batch_size: usize,
+        cfg: &Config,
+        vb: Option<VarBuilder>,
+        dev: &Device,
+    ) -> Result<Self> {
         let mut per_layer = Vec::with_capacity(cfg.num_hidden_layers);
         // Certainly a weird convention but taken from modeling_rwkv5.py
         let num_attention_heads = cfg.hidden_size / cfg.num_attention_heads;
-        for _layer_idx in 0..cfg.num_hidden_layers {
+        for layer_idx in 0..cfg.num_hidden_layers {
             let extract_key_value = Tensor::zeros((batch_size, cfg.hidden_size), DType::F32, dev)?;
-            let linear_attention = Tensor::zeros(
-                (
-                    batch_size,
-                    num_attention_heads,
-                    cfg.hidden_size / num_attention_heads,
-                    cfg.hidden_size / num_attention_heads,
-                ),
-                DType::F32,
-                dev,
-            )?;
+            let linear_attention = match vb {
+                Some(ref v) => v
+                    .get(
+                        (
+                            num_attention_heads,
+                            cfg.hidden_size / num_attention_heads,
+                            cfg.hidden_size / num_attention_heads,
+                        ),
+                        &format!("rwkv.blocks.{layer_idx}.attention.time_state"),
+                    )?
+                    .reshape((
+                        batch_size,
+                        num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                    ))?,
+                None => Tensor::zeros(
+                    (
+                        batch_size,
+                        num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                    ),
+                    DType::F32,
+                    dev,
+                )?,
+            };
+            let feed_forward = Tensor::zeros((batch_size, cfg.hidden_size), DType::F32, dev)?;
+            per_layer.push(StatePerLayer {
+                extract_key_value,
+                linear_attention,
+                feed_forward,
+            });
+        }
+        Ok(Self { per_layer, pos: 0 })
+    }
+
+    pub fn new_quantized(
+        batch_size: usize,
+        cfg: &Config,
+        vb: Option<QVarBuilder>,
+        dev: &Device,
+    ) -> Result<Self> {
+        let mut per_layer = Vec::with_capacity(cfg.num_hidden_layers);
+        // Certainly a weird convention but taken from modeling_rwkv5.py
+        let num_attention_heads = cfg.hidden_size / cfg.num_attention_heads;
+        for layer_idx in 0..cfg.num_hidden_layers {
+            let extract_key_value = Tensor::zeros((batch_size, cfg.hidden_size), DType::F32, dev)?;
+            let linear_attention = match vb {
+                Some(ref v) => v
+                    .get(
+                        (
+                            num_attention_heads,
+                            cfg.hidden_size / num_attention_heads,
+                            cfg.hidden_size / num_attention_heads,
+                        ),
+                        &format!("rwkv.blocks.{layer_idx}.attention.time_state"),
+                    )?
+                    .dequantize(v.device())?
+                    .reshape((
+                        batch_size,
+                        num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                    ))?,
+                None => Tensor::zeros(
+                    (
+                        batch_size,
+                        num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                        cfg.hidden_size / num_attention_heads,
+                    ),
+                    DType::F32,
+                    dev,
+                )?,
+            };
             let feed_forward = Tensor::zeros((batch_size, cfg.hidden_size), DType::F32, dev)?;
             per_layer.push(StatePerLayer {
                 extract_key_value,

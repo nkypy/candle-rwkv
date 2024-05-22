@@ -6,6 +6,7 @@
 - [x] quantized RWKV5
 - [x] RWKV6
 - [x] quantized RWKV6
+- [x] state tuned
 
 ### PRs into candle
 
@@ -23,11 +24,8 @@ cargo run --release --example rwkv -- --which "world6-3b" --prompt "Assistant: S
 # run quantized rwkv6
 cargo run --release --example rwkv -- --quantized --which "world6-3b" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
 
-# run rwkv5
-cargo run --release --example rwkv -- --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
-
-# run quantized rwkv5
-cargo run --release --example rwkv -- --quantized --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+# run state-tuned rwkv6
+cargo run --release --example rwkv -- --state-tuned --which "world6-3b" --prompt "How can I craft an engaging story featuring vampires on Mars?"
 ```
 
 If you want to use local model file. First, download pth file from [Hugging Face](https://huggingface.co/BlinkDL). Then run command below.

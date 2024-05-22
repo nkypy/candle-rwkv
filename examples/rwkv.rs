@@ -37,7 +37,7 @@ impl Model {
 
 struct TextGeneration {
     model: Model,
-    config: Config,
+    // config: Config,
     device: Device,
     tokenizer: Tokenizer,
     logits_processor: LogitsProcessor,
@@ -49,7 +49,7 @@ impl TextGeneration {
     #[allow(clippy::too_many_arguments)]
     fn new(
         model: Model,
-        config: Config,
+        // config: Config,
         tokenizer: Tokenizer,
         seed: u64,
         temp: Option<f64>,
@@ -61,7 +61,7 @@ impl TextGeneration {
         let logits_processor = LogitsProcessor::new(seed, temp, top_p);
         Self {
             model,
-            config,
+            // config,
             tokenizer,
             logits_processor,
             repeat_penalty,
@@ -70,15 +70,15 @@ impl TextGeneration {
         }
     }
 
-    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<()> {
+    fn run(&mut self, state: &mut State, prompt: &str, sample_len: usize) -> Result<()> {
         use std::io::Write;
         let mut tokens = self.tokenizer.encode(prompt)?;
         let mut generated_tokens = 0usize;
-        let mut state = State::new(1, &self.config, &self.device)?;
+        // let mut state = State::new(1, &self.config, None, &self.device)?;
         let mut next_logits = None;
         for &t in tokens.iter() {
             let input = Tensor::new(&[[t]], &self.device)?;
-            let logits = self.model.forward(&input, &mut state)?;
+            let logits = self.model.forward(&input, state)?;
             next_logits = Some(logits);
             print!("{}", self.tokenizer.decode(&[t])?)
         }
@@ -120,7 +120,7 @@ impl TextGeneration {
             std::io::stdout().flush()?;
 
             let input = Tensor::new(&[[next_token]], &self.device)?;
-            next_logits = Some(self.model.forward(&input, &mut state)?)
+            next_logits = Some(self.model.forward(&input, state)?)
         }
         let dt = start_gen.elapsed();
         println!(
@@ -207,10 +207,16 @@ struct Args {
     weight_files: Option<String>,
 
     #[arg(long)]
+    state_files: Option<String>,
+
+    #[arg(long)]
     config_file: Option<String>,
 
     #[arg(long)]
     quantized: bool,
+
+    #[arg(long)]
+    state_tuned: bool,
 
     /// Penalty to be applied for repeating tokens, 1. means no penalty.
     #[arg(long, default_value_t = 1.1)]
@@ -348,9 +354,58 @@ fn main() -> Result<()> {
     };
     println!("loaded the model on {:?} in {:?}", &device, start.elapsed());
 
+    let state_file = match args.state_files {
+        Some(files) => Some(files.into()),
+        None => {
+            if args.state_tuned {
+                match args.which {
+                    Which::World6_1b6 => Some(if args.quantized {
+                        repo.get("rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.Q4_K_M.gguf")?
+                    } else {
+                        repo.get("rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.safetensors")?
+                    }),
+                    Which::World6_3b => Some(if args.quantized {
+                        repo.get("rwkv-x060-chn_single_round_qa-3B-20240516-ctx2048.Q4_K_M.gguf")?
+                    } else {
+                        repo.get("rwkv-x060-chn_single_round_qa-3B-20240516-ctx2048.safetensors")?
+                    }),
+                    Which::World6_7b => Some(if args.quantized {
+                        repo.get("rwkv-x060-chn_single_round_qa-7B-20240516-ctx2048.Q4_K_M.gguf")?
+                    } else {
+                        repo.get("rwkv-x060-chn_single_round_qa-7B-20240516-ctx2048.safetensors")?
+                    }),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }
+    };
+
+    let start = std::time::Instant::now();
+
+    let mut state = match state_file {
+        Some(file) => {
+            if args.quantized {
+                let vb = candle_transformers::quantized_var_builder::VarBuilder::from_gguf(
+                    file, &device,
+                )?;
+                State::new_quantized(1, &config, Some(vb), &device)?
+            } else {
+                let vb = unsafe {
+                    VarBuilder::from_mmaped_safetensors(&vec![file], DType::F32, &device)?
+                };
+                State::new(1, &config, Some(vb), &device)?
+            }
+        }
+        None => State::new(1, &config, None, &device)?,
+    };
+
+    println!("loaded the state on {:?} in {:?}", &device, start.elapsed());
+
     let mut pipeline = TextGeneration::new(
         model,
-        config,
+        // config,
         tokenizer,
         args.seed,
         args.temperature,
@@ -359,6 +414,11 @@ fn main() -> Result<()> {
         args.repeat_last_n,
         &device,
     );
-    pipeline.run(&args.prompt, args.sample_len)?;
+    let prompt = if args.state_tuned {
+        format!("User: {}\n\nAssistant:", args.prompt.clone())
+    } else {
+        args.prompt.clone()
+    };
+    pipeline.run(&mut state, &prompt, args.sample_len)?;
     Ok(())
 }
