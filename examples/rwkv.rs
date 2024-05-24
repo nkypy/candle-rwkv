@@ -321,7 +321,7 @@ fn main() -> Result<()> {
             }
         }
     };
-    println!("retrieved the files in {:?}", start.elapsed());
+    println!("retrieved the weight files in {:?}", start.elapsed());
     let tokenizer = Tokenizer::new(tokenizer)?;
 
     let start = std::time::Instant::now();
@@ -354,6 +354,7 @@ fn main() -> Result<()> {
     };
     println!("loaded the model on {:?} in {:?}", &device, start.elapsed());
 
+    let start = std::time::Instant::now();
     let state_file = match args.state_files {
         Some(files) => Some(files.into()),
         None => {
@@ -381,6 +382,10 @@ fn main() -> Result<()> {
             }
         }
     };
+
+    if !state_file.is_none() {
+        println!("retrieved the state files in {:?}", start.elapsed());
+    }
 
     let mut state = match state_file {
         Some(file) => {

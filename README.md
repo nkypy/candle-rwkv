@@ -19,16 +19,16 @@ If you just want to have a try. Run command below.
 
 ```bash
 # run rwkv6
-cargo run --release --example rwkv -- --which "world6-3b" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --which "world6-3b" --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
 
 # run quantized rwkv6
-cargo run --release --example rwkv -- --quantized --which "world6-3b" --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --quantized --which "world6-3b" --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
 
 # run state-tuned rwkv6
-cargo run --release --example rwkv -- --state-tuned --which "world6-3b" --prompt "How can I craft an engaging story featuring vampires on Mars?"
+cargo run --release --example rwkv -- --state-tuned --which "world6-3b" --prompt "我在深圳，我要去埃及金字塔，我要怎么走?"
 
 # run quantized state-tuned rwkv6
-cargo run --release --example rwkv -- --quantized --state-tuned --which "world6-3b" --prompt "How can I craft an engaging story featuring vampires on Mars?"
+cargo run --release --example rwkv -- --quantized --state-tuned --which "world6-3b" --prompt "我在深圳，我要去埃及金字塔，我要怎么走?"
 ```
 
 If you want to use local model file. First, download pth file from [Hugging Face](https://huggingface.co/BlinkDL). Then run command below.
@@ -37,7 +37,7 @@ If you want to use local model file. First, download pth file from [Hugging Face
 # convert pth to safetensors
 cargo run --release --example convert -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
 # run rwkv6
-cargo run --release --example rwkv -- --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
 
 
 # quanzited model
@@ -45,7 +45,7 @@ cargo run --release --example rwkv -- --which "world6-1b6" --weight-files ./RWKV
 # quantize pth to gguf
 cargo run --release --example quantize -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
 # run quantized rwkv6
-cargo run --release --example rwkv -- --quantized --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf --prompt "Assistant: Sure! Here is a very detailed plan to create flying pigs:"
+cargo run --release --example rwkv -- --quantized --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
 ```
 
 ### Others
