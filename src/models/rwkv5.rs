@@ -58,6 +58,7 @@ impl State {
                         ),
                         &format!("rwkv.blocks.{layer_idx}.attention.time_state"),
                     )?
+                    .transpose(1, 2)?
                     .reshape((
                         batch_size,
                         num_attention_heads,
@@ -107,6 +108,7 @@ impl State {
                         &format!("rwkv.blocks.{layer_idx}.attention.time_state"),
                     )?
                     .dequantize(v.device())?
+                    .transpose(1, 2)?
                     .reshape((
                         batch_size,
                         num_attention_heads,

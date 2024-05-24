@@ -382,26 +382,29 @@ fn main() -> Result<()> {
         }
     };
 
-    let start = std::time::Instant::now();
-
     let mut state = match state_file {
         Some(file) => {
+            let start = std::time::Instant::now();
             if args.quantized {
                 let vb = candle_transformers::quantized_var_builder::VarBuilder::from_gguf(
                     file, &device,
                 )?;
+                println!(
+                    "loaded the quantized state on {:?} in {:?}",
+                    &device,
+                    start.elapsed()
+                );
                 State::new_quantized(1, &config, Some(vb), &device)?
             } else {
                 let vb = unsafe {
                     VarBuilder::from_mmaped_safetensors(&vec![file], DType::F32, &device)?
                 };
+                println!("loaded the state on {:?} in {:?}", &device, start.elapsed());
                 State::new(1, &config, Some(vb), &device)?
             }
         }
         None => State::new(1, &config, None, &device)?,
     };
-
-    println!("loaded the state on {:?} in {:?}", &device, start.elapsed());
 
     let mut pipeline = TextGeneration::new(
         model,
@@ -415,7 +418,7 @@ fn main() -> Result<()> {
         &device,
     );
     let prompt = if args.state_tuned {
-        format!("User: {}\n\nAssistant:", args.prompt.clone())
+        format!("User: {}\n\nAssistant: ", args.prompt.clone())
     } else {
         args.prompt.clone()
     };
