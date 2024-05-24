@@ -26,6 +26,9 @@ cargo run --release --example rwkv -- --quantized --which "world6-3b" --prompt "
 
 # run state-tuned rwkv6
 cargo run --release --example rwkv -- --state-tuned --which "world6-3b" --prompt "How can I craft an engaging story featuring vampires on Mars?"
+
+# run quantized state-tuned rwkv6
+cargo run --release --example rwkv -- --quantized --state-tuned --which "world6-3b" --prompt "How can I craft an engaging story featuring vampires on Mars?"
 ```
 
 If you want to use local model file. First, download pth file from [Hugging Face](https://huggingface.co/BlinkDL). Then run command below.
