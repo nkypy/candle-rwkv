@@ -37,7 +37,6 @@ impl Model {
 
 struct TextGeneration {
     model: Model,
-    // config: Config,
     device: Device,
     tokenizer: Tokenizer,
     logits_processor: LogitsProcessor,
@@ -49,7 +48,6 @@ impl TextGeneration {
     #[allow(clippy::too_many_arguments)]
     fn new(
         model: Model,
-        // config: Config,
         tokenizer: Tokenizer,
         seed: u64,
         temp: Option<f64>,
@@ -61,7 +59,6 @@ impl TextGeneration {
         let logits_processor = LogitsProcessor::new(seed, temp, top_p);
         Self {
             model,
-            // config,
             tokenizer,
             logits_processor,
             repeat_penalty,
@@ -74,7 +71,6 @@ impl TextGeneration {
         use std::io::Write;
         let mut tokens = self.tokenizer.encode(prompt)?;
         let mut generated_tokens = 0usize;
-        // let mut state = State::new(1, &self.config, None, &self.device)?;
         let mut next_logits = None;
         for &t in tokens.iter() {
             let input = Tensor::new(&[[t]], &self.device)?;
@@ -149,14 +145,14 @@ impl Which {
     fn model_id(&self) -> &'static str {
         match self {
             Self::World1b5 => "RWKV/rwkv-5-world-1b5",
-            Self::World6_1b6 | Self::World6_3b | Self::World6_7b => "paperfun/rwkv",
+            _ => "paperfun/rwkv",
         }
     }
 
     fn revision(&self) -> &'static str {
         match self {
             Self::World1b5 => "refs/pr/2",
-            Self::World6_1b6 | Self::World6_3b | Self::World6_7b => "main",
+            _ => "main",
         }
     }
 }
@@ -193,15 +189,6 @@ struct Args {
 
     #[arg(long, default_value = "world1b5")]
     which: Which,
-
-    #[arg(long)]
-    model_id: Option<String>,
-
-    #[arg(long)]
-    revision: Option<String>,
-
-    #[arg(long)]
-    tokenizer: Option<String>,
 
     #[arg(long)]
     weight_files: Option<String>,
@@ -256,28 +243,17 @@ fn main() -> Result<()> {
     let start = std::time::Instant::now();
     let api = Api::new()?;
     let repo = api.repo(Repo::with_revision(
-        args.model_id
-            .unwrap_or_else(|| args.which.model_id().to_string()),
+        args.which.model_id().to_string(),
         RepoType::Model,
-        args.revision
-            .unwrap_or_else(|| args.which.revision().to_string()),
+        args.which.revision().to_string(),
     ));
-    let tokenizer = match args.tokenizer {
-        Some(file) => std::path::PathBuf::from(file),
-        None => api
-            .model("lmz/candle-rwkv".to_string())
-            .get("rwkv_vocab_v20230424.json")?,
-    };
+    let tokenizer = api
+        .model("lmz/candle-rwkv".to_string())
+        .get("rwkv_vocab_v20230424.json")?;
     let config_filename = match args.config_file {
         Some(file) => std::path::PathBuf::from(file),
         None => match args.which {
-            Which::World1b5 | Which::World6_1b6 => api
-                .repo(Repo::with_revision(
-                    "RWKV/rwkv-5-world-1b5".to_string(),
-                    RepoType::Model,
-                    "refs/pr/2".to_string(),
-                ))
-                .get("config.json")?,
+            Which::World1b5 | Which::World6_1b6 => repo.get("config.json")?,
             Which::World6_3b => repo.get("config_3b.json")?,
             Which::World6_7b => repo.get("config_7b.json")?,
         },
@@ -339,17 +315,13 @@ fn main() -> Result<()> {
             candle_transformers::quantized_var_builder::VarBuilder::from_gguf(filename, &device)?;
         match args.which {
             Which::World1b5 => Model::Q5(Q5::new(&config, vb)?),
-            Which::World6_1b6 | Which::World6_3b | Which::World6_7b => {
-                Model::Q6(Q6::new(&config, vb)?)
-            }
+            _ => Model::Q6(Q6::new(&config, vb)?),
         }
     } else {
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, DType::F32, &device)? };
         match args.which {
             Which::World1b5 => Model::M5(M5::new(&config, vb)?),
-            Which::World6_1b6 | Which::World6_3b | Which::World6_7b => {
-                Model::M6(M6::new(&config, vb)?)
-            }
+            _ => Model::M6(M6::new(&config, vb)?),
         }
     };
     println!("loaded the model on {:?} in {:?}", &device, start.elapsed());
@@ -360,21 +332,15 @@ fn main() -> Result<()> {
         None => {
             if args.state_tuned {
                 match args.which {
-                    Which::World6_1b6 => Some(if args.quantized {
-                        repo.get("rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.Q4_K_M.gguf")?
-                    } else {
-                        repo.get("rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.safetensors")?
-                    }),
-                    Which::World6_3b => Some(if args.quantized {
-                        repo.get("rwkv-x060-chn_single_round_qa-3B-20240516-ctx2048.Q4_K_M.gguf")?
-                    } else {
-                        repo.get("rwkv-x060-chn_single_round_qa-3B-20240516-ctx2048.safetensors")?
-                    }),
-                    Which::World6_7b => Some(if args.quantized {
-                        repo.get("rwkv-x060-chn_single_round_qa-7B-20240516-ctx2048.Q4_K_M.gguf")?
-                    } else {
-                        repo.get("rwkv-x060-chn_single_round_qa-7B-20240516-ctx2048.safetensors")?
-                    }),
+                    Which::World6_1b6 => Some(
+                        repo.get("rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.safetensors")?,
+                    ),
+                    Which::World6_3b => Some(
+                        repo.get("rwkv-x060-chn_single_round_qa-3B-20240516-ctx2048.safetensors")?,
+                    ),
+                    Which::World6_7b => Some(
+                        repo.get("rwkv-x060-chn_single_round_qa-7B-20240516-ctx2048.safetensors")?,
+                    ),
                     _ => None,
                 }
             } else {
@@ -387,33 +353,20 @@ fn main() -> Result<()> {
         println!("retrieved the state files in {:?}", start.elapsed());
     }
 
+    // state files are small, no need to quantize
     let mut state = match state_file {
         Some(file) => {
             let start = std::time::Instant::now();
-            if args.quantized {
-                let vb = candle_transformers::quantized_var_builder::VarBuilder::from_gguf(
-                    file, &device,
-                )?;
-                println!(
-                    "loaded the quantized state on {:?} in {:?}",
-                    &device,
-                    start.elapsed()
-                );
-                State::new_quantized(1, &config, Some(vb), &device)?
-            } else {
-                let vb = unsafe {
-                    VarBuilder::from_mmaped_safetensors(&vec![file], DType::F32, &device)?
-                };
-                println!("loaded the state on {:?} in {:?}", &device, start.elapsed());
-                State::new(1, &config, Some(vb), &device)?
-            }
+            let vb =
+                unsafe { VarBuilder::from_mmaped_safetensors(&vec![file], DType::F32, &device)? };
+            println!("loaded the state on {:?} in {:?}", &device, start.elapsed());
+            State::new(1, &config, Some(vb), &device)?
         }
         None => State::new(1, &config, None, &device)?,
     };
 
     let mut pipeline = TextGeneration::new(
         model,
-        // config,
         tokenizer,
         args.seed,
         args.temperature,
