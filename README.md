@@ -34,10 +34,14 @@ cargo run --release --example rwkv -- --quantized --state-tuned --which "world6-
 If you want to use local model file. First, download pth file from [Hugging Face](https://huggingface.co/BlinkDL). Then run command below.
 
 ```bash
-# convert pth to safetensors
+# convert model file to safetensors
 cargo run --release --example convert -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
-# run rwkv6
-cargo run --release --example rwkv -- --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
+
+# convert state file to safetensors
+cargo run --release --example convert -- --input ./rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.pth
+
+# run state tuned rwkv6
+cargo run --release --example rwkv -- --which "world6-1b6" --state-tuned --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors --state-files ./rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.safetensors --prompt "我在深圳，我要去埃及金字塔，我要怎么走?"
 
 
 # quanzited model
