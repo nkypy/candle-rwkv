@@ -163,7 +163,7 @@ fn main() -> anyhow::Result<()> {
 
     // read file to tensors
     println!(
-        "main: quantizing '{}' to '{}' as {}",
+        "quantizing '{}' to '{}' as {}",
         &args.input, &output, &args.quantization
     );
     let tensors = RepugnantTorchTensors::new_from_file(&args.input)?;

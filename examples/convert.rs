@@ -106,8 +106,16 @@ fn rename(mut name: String) -> String {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    let output = if let Some(output) = args.output {
+        output
+    } else {
+        let mut path = PathBuf::from(&args.input);
+        path.set_extension("safetensors");
+        path.to_str().unwrap().to_owned()
+    };
+
     // read file to tensors
-    println!("reading model file: {}", &args.input);
+    println!("converting '{}' to '{}'", &args.input, &output);
 
     let tensors = RepugnantTorchTensors::new_from_file(&args.input)?;
 
@@ -130,13 +138,7 @@ fn main() -> anyhow::Result<()> {
             (name, tensor)
         })
         .collect::<HashMap<String, candle::Tensor>>();
-    let output = if let Some(output) = args.output {
-        output
-    } else {
-        let mut path = PathBuf::from(&args.input);
-        path.set_extension("safetensors");
-        path.to_str().unwrap().to_owned()
-    };
+
     // save to safetensors file
     candle::safetensors::save(&tensors, &output)?;
     println!("converted to safetensors file: {}", output);

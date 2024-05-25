@@ -28,7 +28,9 @@ rand = "0.8.5"
 byteorder = "1.5.0"
 half = "2.4.0"
 bytemuck = "1.15.0"
-repugnant-pickle = { version = "0.0.1", features = ["torch"] }
+repugnant-pickle = { version = "0.0.1", features = [
+    "torch",
+], git = "https://github.com/nkypy/repugnant-pickle.git" }
 
 [features]
 default = []
