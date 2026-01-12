@@ -64,13 +64,49 @@ impl SelfAttention {
         let x_g = vb.get((1, 1, cfg.hidden_size), "x_g")?;
         let r_k = vb.get((n_head, head_size), "r_k")?;
         let w0 = vb.get((1, 1, cfg.hidden_size), "w0")?;
-        let w1 = vb.get((cfg.hidden_size, 64), "w1")?;
-        let w2 = vb.get((64, cfg.hidden_size), "w2")?;
+        let w1 = vb.get(
+            (
+                cfg.hidden_size,
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+            ),
+            "w1",
+        )?;
+        let w2 = vb.get(
+            (
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                cfg.hidden_size,
+            ),
+            "w2",
+        )?;
         let a0 = vb.get((1, 1, cfg.hidden_size), "a0")?;
-        let a1 = vb.get((cfg.hidden_size, 64), "a1")?;
-        let a2 = vb.get((64, cfg.hidden_size), "a2")?;
-        let g1 = vb.get((cfg.hidden_size, 128), "g1")?;
-        let g2 = vb.get((128, cfg.hidden_size), "g2")?;
+        let a1 = vb.get(
+            (
+                cfg.hidden_size,
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+            ),
+            "a1",
+        )?;
+        let a2 = vb.get(
+            (
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                cfg.hidden_size,
+            ),
+            "a2",
+        )?;
+        let g1 = vb.get(
+            (
+                cfg.hidden_size,
+                if cfg.hidden_size >= 2048 { 256 } else { 128 },
+            ),
+            "g1",
+        )?;
+        let g2 = vb.get(
+            (
+                if cfg.hidden_size >= 2048 { 256 } else { 128 },
+                cfg.hidden_size,
+            ),
+            "g2",
+        )?;
 
         let v0 = if layer_id == 0 {
             None
@@ -80,12 +116,24 @@ impl SelfAttention {
         let v1 = if layer_id == 0 {
             None
         } else {
-            Some(vb.get((cfg.hidden_size, 32), "v1")?)
+            Some(vb.get(
+                (
+                    cfg.hidden_size,
+                    if cfg.hidden_size >= 2048 { 64 } else { 32 },
+                ),
+                "v1",
+            )?)
         };
         let v2 = if layer_id == 0 {
             None
         } else {
-            Some(vb.get((32, cfg.hidden_size), "v2")?)
+            Some(vb.get(
+                (
+                    if cfg.hidden_size >= 2048 { 64 } else { 32 },
+                    cfg.hidden_size,
+                ),
+                "v2",
+            )?)
         };
 
         let k_k = vb.get((1, 1, cfg.hidden_size), "k_k")?;

@@ -26,7 +26,7 @@ Run inference directly from the command line.
 
 ```bash
 # Run RWKV7 (Goose)
-cargo run --release --example rwkv -- --which "v7-0b1" --prompt "User: why is the sky blue?\n\nAssistant: "
+cargo run --release --example rwkv -- --which "g1-1b5" --prompt "User: why is the sky blue?\n\nAssistant: "
 
 # Run RWKV6 (Finch)
 cargo run --release --example rwkv -- --which "v6-1b6" --prompt "User: Hello, how are you?\n\nAssistant: "
@@ -37,7 +37,7 @@ Running on a laptop? Use quantization to save memory.
 
 ```bash
 # Run Quantized RWKV7 (Goose)
-cargo run --release --example rwkv -- --quantized --which "v7-0b1" --prompt "User: Tell me a joke.\n\nAssistant: "
+cargo run --release --example rwkv -- --quantized --which "g1-1b5" --prompt "User: Tell me a joke.\n\nAssistant: "
 ```
 
 ## 🛠️ Advanced Usage: Local Models
