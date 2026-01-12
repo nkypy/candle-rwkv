@@ -1,59 +1,87 @@
-# candle-rwkv
+# Candle RWKV 🕯️
 
-### TODOs
+> **A minimalist, high-performance implementation of RWKV (Receptance Weighted Key Value) models using [Candle](https://github.com/huggingface/candle) - a lightweight framework for Rust.**
 
-- [x] RWKV5
-- [x] quantized RWKV5
-- [x] RWKV6
-- [x] quantized RWKV6
-- [x] state tuned
+[![Rust](https://img.shields.io/badge/Built_with-Rust-orange?style=flat-square)](https://www.rust-lang.org/)
+[![Candle](https://img.shields.io/badge/Powered_by-Candle-yellow?style=flat-square)](https://github.com/huggingface/candle)
+[![License](https://img.shields.io/badge/License-MIT%2FApache-blue?style=flat-square)](LICENSE)
 
-### PRs into candle
+[**中文文档 (Chinese)**](README-zh.md)
 
-- RWKV5 [#1743](https://github.com/huggingface/candle/pull/1743)
-- RWKV6 [#1781](https://github.com/huggingface/candle/pull/1781)
+---
 
-### Examples
+## 🌟 Supported Models
+We support the latest and greatest from the RWKV family:
 
-If you just want to have a try. Run command below.
+- ✅ **RWKV7 (Goose)**
+- ✅ **RWKV6 (Finch)**
+- ✅ **RWKV5 (Eagle)**
+
+## 🚀 Quick Start
+
+Ready to run? Here are the commands to get you started immediately.
+
+### 1. Run RWKV Models
+Run inference directly from the command line.
 
 ```bash
-# run rwkv6
-cargo run --release --example rwkv -- --which "world6-3b" --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
+# Run RWKV7 (Goose)
+cargo run --release --example rwkv -- --which "v7-0b1" --prompt "User: why is the sky blue?\n\nAssistant: "
 
-# run quantized rwkv6
-cargo run --release --example rwkv -- --quantized --which "world6-3b" --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
-
-# run state-tuned rwkv6
-cargo run --release --example rwkv -- --state-tuned --which "world6-3b" --prompt "我在深圳，我要去埃及金字塔，我要怎么走?"
-
-# run quantized state-tuned rwkv6
-cargo run --release --example rwkv -- --quantized --state-tuned --which "world6-3b" --prompt "我在深圳，我要去埃及金字塔，我要怎么走?"
+# Run RWKV6 (Finch)
+cargo run --release --example rwkv -- --which "v6-1b6" --prompt "User: Hello, how are you?\n\nAssistant: "
 ```
 
-If you want to use local model file. First, download pth file from [Hugging Face](https://huggingface.co/BlinkDL). Then run command below.
+### 2. Quantized Inference (Memory Efficient)
+Running on a laptop? Use quantization to save memory.
 
 ```bash
-# convert model file to safetensors
+# Run Quantized RWKV7 (Goose)
+cargo run --release --example rwkv -- --quantized --which "v7-0b1" --prompt "User: Tell me a joke.\n\nAssistant: "
+```
+
+## 🛠️ Advanced Usage: Local Models
+
+If you prefer managing your own model files (e.g. download `.pth` from [HuggingFace](https://huggingface.co/BlinkDL)), we provide tools to convert and run them.
+
+### Conversion
+First, convert PyTorch weights (`.pth`) to SafeTensors for efficient loading in Rust.
+
+```bash
+# Convert Model Weights
 cargo run --release --example convert -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
 
-# convert state file to safetensors
+# Convert State Files
 cargo run --release --example convert -- --input ./rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.pth
-
-# run state tuned rwkv6
-cargo run --release --example rwkv -- --which "world6-1b6" --state-tuned --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors --state-files ./rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.safetensors --prompt "我在深圳，我要去埃及金字塔，我要怎么走?"
-
-
-# quanzited model
-
-# quantize pth to gguf
-cargo run --release --example quantize -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
-# run quantized rwkv6
-cargo run --release --example rwkv -- --quantized --which "world6-1b6" --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf --prompt "User: 我在深圳，我要去埃及金字塔，我要怎么走?\n\nAssistant: "
 ```
 
-### Others
+### Running Local Files
+```bash
+# Run with local converted files
+cargo run --release --example rwkv -- \
+  --which "v6-1b6" \
+  --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.safetensors \
+  --state-file ./rwkv-x060-chn_single_round_qa-1B6-20240516-ctx2048.safetensors \
+  --prompt "Hello world!"
+```
 
-All PRs are welcome
+### Quantization (GGUF)
+Convert `.pth` files to standardized GGUF format.
 
-Powered by [candle](https://github.com/huggingface/candle)
+```bash
+# Quantize .pth to .gguf
+cargo run --release --example quantize -- --input ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096.pth
+
+# Run with local GGUF file
+cargo run --release --example rwkv -- \
+  --quantized \
+  --which "v6-1b6" \
+  --weight-files ./RWKV-x060-World-1B6-v2.1-20240328-ctx4096-q4k.gguf \
+  --prompt "User: Hello!\n\nAssistant: "
+```
+
+## 🤝 Contributing
+Contributions are more than welcome! Feel free to open issues or submit PRs.
+
+---
+*Powered by [candle](https://github.com/huggingface/candle)*

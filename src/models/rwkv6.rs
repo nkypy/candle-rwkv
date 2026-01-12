@@ -16,12 +16,12 @@ struct SelfAttention {
     ln_x: candle_nn::GroupNorm,
     time_mix_x: Tensor,
     time_mix_w: Tensor,
-    time_mix_key: Tensor,
-    time_mix_value: Tensor,
-    time_mix_receptance: Tensor,
+    time_mix_k: Tensor,
+    time_mix_v: Tensor,
+    time_mix_r: Tensor,
+    time_mix_g: Tensor,
     time_decay: Tensor,
     time_faaaa: Tensor,
-    time_mix_gate: Tensor,
     time_decay_w1: Tensor,
     time_decay_w2: Tensor,
     time_mix_w1: Tensor,
@@ -54,13 +54,13 @@ impl SelfAttention {
 
         let time_mix_x = vb.get((1, 1, cfg.hidden_size), "time_mix_x")?;
         let time_mix_w = vb.get((1, 1, cfg.hidden_size), "time_mix_w")?;
-        let time_mix_key = vb.get((1, 1, cfg.hidden_size), "time_mix_key")?;
-        let time_mix_value = vb.get((1, 1, cfg.hidden_size), "time_mix_value")?;
-        let time_mix_receptance = vb.get((1, 1, cfg.hidden_size), "time_mix_receptance")?;
+        let time_mix_k = vb.get((1, 1, cfg.hidden_size), "time_mix_k")?;
+        let time_mix_v = vb.get((1, 1, cfg.hidden_size), "time_mix_v")?;
+        let time_mix_r = vb.get((1, 1, cfg.hidden_size), "time_mix_r")?;
+        let time_mix_g = vb.get((1, 1, cfg.hidden_size), "time_mix_g")?;
         let n_attn_heads = cfg.hidden_size / cfg.head_size;
         let time_decay = vb.get((1, 1, cfg.hidden_size), "time_decay")?;
         let time_faaaa = vb.get((n_attn_heads, cfg.head_size), "time_faaaa")?;
-        let time_mix_gate = vb.get((1, 1, cfg.hidden_size), "time_mix_gate")?;
         // for 7B, hidden size 4096 dim is different
         let time_decay_w1 = vb.get(
             (
@@ -116,12 +116,12 @@ impl SelfAttention {
             ln_x,
             time_mix_x,
             time_mix_w,
-            time_mix_key,
-            time_mix_value,
-            time_mix_receptance,
+            time_mix_k,
+            time_mix_v,
+            time_mix_r,
+            time_mix_g,
             time_decay,
             time_faaaa,
-            time_mix_gate,
             time_decay_w1,
             time_decay_w2,
             time_mix_w1,
@@ -157,10 +157,10 @@ impl SelfAttention {
             let (mw, mk, mv, mr, mg) = (xxx.i(0)?, xxx.i(1)?, xxx.i(2)?, xxx.i(3)?, xxx.i(4)?);
 
             let xw = (xs + &sx * (&self.time_mix_w + &mw)?)?;
-            let xk = (xs + &sx * (&self.time_mix_key + &mk)?)?;
-            let xv = (xs + &sx * (&self.time_mix_value + &mv)?)?;
-            let xr = (xs + &sx * (&self.time_mix_receptance + &mr)?)?;
-            let xg = (xs + &sx * (&self.time_mix_gate + &mg)?)?;
+            let xk = (xs + &sx * (&self.time_mix_k + &mk)?)?;
+            let xv = (xs + &sx * (&self.time_mix_v + &mv)?)?;
+            let xr = (xs + &sx * (&self.time_mix_r + &mr)?)?;
+            let xg = (xs + &sx * (&self.time_mix_g + &mg)?)?;
 
             // dbg!(&xw, &xk, &xv, &xr, &xg);
             let w = (&self.time_decay
@@ -214,8 +214,8 @@ impl SelfAttention {
 
 #[derive(Debug, Clone)]
 struct FeedForward {
-    time_mix_key: Tensor,
-    time_mix_receptance: Tensor,
+    time_mix_k: Tensor,
+    time_mix_r: Tensor,
     key: Linear,
     receptance: Linear,
     value: Linear,
@@ -230,14 +230,14 @@ impl FeedForward {
         let key = linear(cfg.hidden_size, int_size, vb.pp("key"))?;
         let receptance = linear(cfg.hidden_size, cfg.hidden_size, vb.pp("receptance"))?;
         let value = linear(int_size, cfg.hidden_size, vb.pp("value"))?;
-        let time_mix_key = vb.get((1, 1, cfg.hidden_size), "time_mix_key")?;
-        let time_mix_receptance = vb.get((1, 1, cfg.hidden_size), "time_mix_receptance")?;
+        let time_mix_k = vb.get((1, 1, cfg.hidden_size), "time_mix_k")?;
+        let time_mix_r = vb.get((1, 1, cfg.hidden_size), "time_mix_r")?;
         Ok(Self {
             key,
             receptance,
             value,
-            time_mix_key,
-            time_mix_receptance,
+            time_mix_k,
+            time_mix_r,
             layer_id,
         })
     }
@@ -246,8 +246,8 @@ impl FeedForward {
         let shifted = state.per_layer[self.layer_id]
             .feed_forward
             .broadcast_sub(xs)?;
-        let key = (xs + shifted.broadcast_mul(&self.time_mix_key)?)?;
-        let receptance = (xs + shifted.broadcast_mul(&self.time_mix_receptance)?)?;
+        let key = (xs + shifted.broadcast_mul(&self.time_mix_k)?)?;
+        let receptance = (xs + shifted.broadcast_mul(&self.time_mix_r)?)?;
         let key = key.apply(&self.key)?.relu()?.sqr()?;
         let value = key.apply(&self.value)?;
         let receptance = candle_nn::ops::sigmoid(&receptance.apply(&self.receptance)?)?;

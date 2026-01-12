@@ -1,12 +1,15 @@
 /target
 
+/.vscode
 /assets
 *.bin
 *.pth
 *.st
 *.safetensors
 *.gguf
+*.json
 *.py
+__pycache__
 
 
 # General

@@ -32,23 +32,6 @@ fn rename(mut name: String) -> String {
     // ffn -> feed_forward
     let re = Regex::new(r"blocks\.(\d+)\.ffn").unwrap();
     name = re.replace(&name, "blocks.$1.feed_forward").to_string();
-    // name = re.sub(r"blocks\.(\d+)\.ffn", r"blocks.\1.feed_forward", name)
-    // time_mix_k -> time_mix_key and reshape
-    if name.ends_with(".time_mix_k") {
-        name = name.replace(".time_mix_k", ".time_mix_key");
-    }
-    // time_mix_v -> time_mix_value and reshape
-    if name.ends_with(".time_mix_v") {
-        name = name.replace(".time_mix_v", ".time_mix_value");
-    }
-    // time_mix_r -> time_mix_receptance and reshape
-    if name.ends_with(".time_mix_r") {
-        name = name.replace(".time_mix_r", ".time_mix_receptance");
-    }
-    // time_mix_g -> time_mix_gate and reshape
-    if name.ends_with(".time_mix_g") {
-        name = name.replace(".time_mix_g", ".time_mix_gate");
-    }
 
     //  time_maa_x -> time_mix_x and reshape
     if name.ends_with(".time_maa_x") {
@@ -60,19 +43,19 @@ fn rename(mut name: String) -> String {
     }
     //  time_maa_k -> time_mix_key and reshape
     if name.ends_with(".time_maa_k") {
-        name = name.replace(".time_maa_k", ".time_mix_key");
+        name = name.replace(".time_maa_k", ".time_mix_k");
     }
     //  time_maa_v -> time_mix_value and reshape
     if name.ends_with(".time_maa_v") {
-        name = name.replace(".time_maa_v", ".time_mix_value");
+        name = name.replace(".time_maa_v", ".time_mix_v");
     }
     //  time_maa_r -> time_mix_receptance and reshape
     if name.ends_with(".time_maa_r") {
-        name = name.replace(".time_maa_r", ".time_mix_receptance");
+        name = name.replace(".time_maa_r", ".time_mix_r");
     }
     //  time_maa_g -> time_mix_gate and reshape
     if name.ends_with(".time_maa_g") {
-        name = name.replace(".time_maa_g", ".time_mix_gate");
+        name = name.replace(".time_maa_g", ".time_mix_g");
     }
     //  time_maa_w1 -> time_mix_w1 and reshape
     if name.ends_with(".time_maa_w1") {
@@ -82,18 +65,10 @@ fn rename(mut name: String) -> String {
     if name.ends_with(".time_maa_w2") {
         name = name.replace(".time_maa_w2", ".time_mix_w2");
     }
-    // //  time_faaaa -> time_first and reshape
-    // if name.ends_with(".time_faaaa") {
-    //     name = name.replace(".time_faaaa", ".time_first");
-    // }
 
-    //  lora_A -> lora.0 and reshape
-    if name.ends_with(".lora_A") {
-        name = name.replace(".lora_A", ".lora.0");
-    }
-    // lora_B -> lora.1 and reshape
-    if name.ends_with(".lora_B") {
-        name = name.replace(".lora_B", ".lora.1");
+    //  time_maa_a -> time_mix_a and reshape
+    if name.ends_with(".time_maa_a") {
+        name = name.replace(".time_maa_a", ".time_mix_a");
     }
 
     if name != "head.weight" {
