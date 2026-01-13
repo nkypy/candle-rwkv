@@ -153,6 +153,7 @@ impl TextGeneration {
 
 #[derive(Parser, ValueEnum, Clone, Copy, PartialEq, Eq, Debug)]
 enum Which {
+    G1_0b1, // rwkv7-g1a-0.1b-20250728-ctx4096.pth
     G1_1b5, // rwkv7-g1c-1.5b-20260110-ctx8192.pth
     V6_1b6,
     V5_1b5,
@@ -167,6 +168,7 @@ impl std::fmt::Display for Which {
 impl Which {
     fn model_id(&self) -> &'static str {
         match self {
+            Self::G1_0b1 => "paperfun/rwkv-x070-g1-0b1",
             Self::G1_1b5 => "paperfun/rwkv-x070-g1-1b5",
             Self::V6_1b6 => "paperfun/rwkv-x060-world-1b6",
             Self::V5_1b5 => "RWKV/rwkv-5-world-1b5",
@@ -211,7 +213,7 @@ struct Args {
     #[arg(long, short = 'n', default_value_t = 500)]
     sample_len: usize,
 
-    #[arg(long, default_value = "v7-0b1")]
+    #[arg(long, default_value = "g1-0b1")]
     which: Which,
 
     #[arg(long)]
@@ -317,14 +319,14 @@ fn main() -> Result<()> {
         let vb =
             candle_transformers::quantized_var_builder::VarBuilder::from_gguf(filename, &device)?;
         match args.which {
-            Which::G1_1b5 => Model::Q7(Q7::new(&config, vb)?),
+            Which::G1_0b1 | Which::G1_1b5 => Model::Q7(Q7::new(&config, vb)?),
             Which::V6_1b6 => Model::Q6(Q6::new(&config, vb)?),
             Which::V5_1b5 => Model::Q5(Q5::new(&config, vb)?),
         }
     } else {
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&filenames, DType::F32, &device)? };
         match args.which {
-            Which::G1_1b5 => Model::M7(M7::new(&config, vb)?),
+            Which::G1_0b1 | Which::G1_1b5 => Model::M7(M7::new(&config, vb)?),
             Which::V6_1b6 => Model::M6(M6::new(&config, vb)?),
             Which::V5_1b5 => Model::M5(M5::new(&config, vb)?),
         }
