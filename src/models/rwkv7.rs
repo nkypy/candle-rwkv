@@ -7,7 +7,7 @@ use candle_nn::{
 pub use crate::models::rwkv5::{Config, State, Tokenizer};
 
 #[derive(Debug, Clone)]
-struct SelfAttention {
+pub struct SelfAttention {
     x_r: Tensor,
     x_w: Tensor,
     x_k: Tensor,
@@ -281,7 +281,7 @@ impl SelfAttention {
 }
 
 #[derive(Debug, Clone)]
-struct FeedForward {
+pub struct FeedForward {
     x_k: Tensor,
     key: Linear,
     value: Linear,
@@ -301,7 +301,7 @@ impl FeedForward {
         })
     }
 
-    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let shifted = state.per_layer[self.layer_id].feed_forward.clone();
         let shifted = if shifted.rank() == 2 {
             shifted.unsqueeze(1)?
@@ -318,12 +318,12 @@ impl FeedForward {
 }
 
 #[derive(Debug, Clone)]
-struct Block {
+pub struct Block {
     pre_ln: Option<LayerNorm>,
     ln1: LayerNorm,
     ln2: LayerNorm,
-    attention: SelfAttention,
-    feed_forward: FeedForward,
+    pub attention: SelfAttention,
+    pub feed_forward: FeedForward,
 }
 
 impl Block {
@@ -370,7 +370,7 @@ impl Block {
 #[derive(Debug, Clone)]
 pub struct Model {
     embeddings: Embedding,
-    blocks: Vec<Block>,
+    pub blocks: Vec<Block>,
     ln_out: LayerNorm,
     head: Linear,
     rescale_every: usize,

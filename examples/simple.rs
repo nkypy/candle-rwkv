@@ -19,6 +19,22 @@ pub fn main() -> Result<()> {
     let input = Tensor::new(&[[1u32]], &Device::Cpu).unwrap();
     let output = model.forward(&input, &mut state).unwrap();
     let data = output.to_vec3::<f32>().unwrap()[0][0].to_vec();
-    println!("Result: {:?}", &data[..50]);
+    println!("Result: {:?}\n====================", &data[..20]);
+    let input = Tensor::new(&[[[1f32; 768]]], &Device::Cpu).unwrap();
+    let (output, _) = model.blocks[0]
+        .attention
+        .forward(&input, None, &mut state)
+        .unwrap();
+    let data = output.to_vec3::<f32>().unwrap()[0][0].to_vec();
+    println!(
+        "attention Result: {:?}\n=======================",
+        &data[..20]
+    );
+    let output = model.blocks[0]
+        .feed_forward
+        .forward(&input, &mut state)
+        .unwrap();
+    let data = output.to_vec3::<f32>().unwrap()[0][0].to_vec();
+    println!("feed_forward Result: {:?}", &data[..20]);
     Ok(())
 }
