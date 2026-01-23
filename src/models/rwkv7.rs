@@ -7,7 +7,7 @@ use candle_nn::{
 pub use crate::models::rwkv5::{Config, State, Tokenizer};
 
 #[derive(Debug, Clone)]
-struct SelfAttention {
+pub struct SelfAttention {
     x_r: Tensor,
     x_w: Tensor,
     x_k: Tensor,
@@ -64,13 +64,49 @@ impl SelfAttention {
         let x_g = vb.get((1, 1, cfg.hidden_size), "x_g")?;
         let r_k = vb.get((n_head, head_size), "r_k")?;
         let w0 = vb.get((1, 1, cfg.hidden_size), "w0")?;
-        let w1 = vb.get((cfg.hidden_size, 64), "w1")?;
-        let w2 = vb.get((64, cfg.hidden_size), "w2")?;
+        let w1 = vb.get(
+            (
+                cfg.hidden_size,
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+            ),
+            "w1",
+        )?;
+        let w2 = vb.get(
+            (
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                cfg.hidden_size,
+            ),
+            "w2",
+        )?;
         let a0 = vb.get((1, 1, cfg.hidden_size), "a0")?;
-        let a1 = vb.get((cfg.hidden_size, 64), "a1")?;
-        let a2 = vb.get((64, cfg.hidden_size), "a2")?;
-        let g1 = vb.get((cfg.hidden_size, 128), "g1")?;
-        let g2 = vb.get((128, cfg.hidden_size), "g2")?;
+        let a1 = vb.get(
+            (
+                cfg.hidden_size,
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+            ),
+            "a1",
+        )?;
+        let a2 = vb.get(
+            (
+                if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                cfg.hidden_size,
+            ),
+            "a2",
+        )?;
+        let g1 = vb.get(
+            (
+                cfg.hidden_size,
+                if cfg.hidden_size >= 2048 { 256 } else { 128 },
+            ),
+            "g1",
+        )?;
+        let g2 = vb.get(
+            (
+                if cfg.hidden_size >= 2048 { 256 } else { 128 },
+                cfg.hidden_size,
+            ),
+            "g2",
+        )?;
 
         let v0 = if layer_id == 0 {
             None
@@ -80,12 +116,24 @@ impl SelfAttention {
         let v1 = if layer_id == 0 {
             None
         } else {
-            Some(vb.get((cfg.hidden_size, 32), "v1")?)
+            Some(vb.get(
+                (
+                    cfg.hidden_size,
+                    if cfg.hidden_size >= 2048 { 64 } else { 32 },
+                ),
+                "v1",
+            )?)
         };
         let v2 = if layer_id == 0 {
             None
         } else {
-            Some(vb.get((32, cfg.hidden_size), "v2")?)
+            Some(vb.get(
+                (
+                    if cfg.hidden_size >= 2048 { 64 } else { 32 },
+                    cfg.hidden_size,
+                ),
+                "v2",
+            )?)
         };
 
         let k_k = vb.get((1, 1, cfg.hidden_size), "k_k")?;
@@ -233,7 +281,7 @@ impl SelfAttention {
 }
 
 #[derive(Debug, Clone)]
-struct FeedForward {
+pub struct FeedForward {
     x_k: Tensor,
     key: Linear,
     value: Linear,
@@ -253,7 +301,7 @@ impl FeedForward {
         })
     }
 
-    fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
+    pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let shifted = state.per_layer[self.layer_id].feed_forward.clone();
         let shifted = if shifted.rank() == 2 {
             shifted.unsqueeze(1)?
@@ -270,12 +318,12 @@ impl FeedForward {
 }
 
 #[derive(Debug, Clone)]
-struct Block {
+pub struct Block {
     pre_ln: Option<LayerNorm>,
     ln1: LayerNorm,
     ln2: LayerNorm,
-    attention: SelfAttention,
-    feed_forward: FeedForward,
+    pub attention: SelfAttention,
+    pub feed_forward: FeedForward,
 }
 
 impl Block {
@@ -322,7 +370,7 @@ impl Block {
 #[derive(Debug, Clone)]
 pub struct Model {
     embeddings: Embedding,
-    blocks: Vec<Block>,
+    pub blocks: Vec<Block>,
     ln_out: LayerNorm,
     head: Linear,
     rescale_every: usize,

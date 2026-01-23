@@ -26,7 +26,7 @@
 
 ```bash
 # 运行 RWKV7 (Goose)
-cargo run --release --example rwkv -- --which "v7-0b1" --prompt "User: 为什么天空是蓝色的？\n\nAssistant: "
+cargo run --release --example rwkv -- --which "g1-1b5" --prompt "User: 为什么天空是蓝色的？\n\nAssistant: "
 
 # 运行 RWKV6 (Finch)
 cargo run --release --example rwkv -- --which "v6-1b6" --prompt "User: 你好，请介绍一下你自己。\n\nAssistant: "
@@ -37,12 +37,12 @@ cargo run --release --example rwkv -- --which "v6-1b6" --prompt "User: 你好，
 
 ```bash
 # 运行量化版 RWKV7 (Goose)
-cargo run --release --example rwkv -- --quantized --which "v7-0b1" --prompt "User: 给我讲个笑话。\n\nAssistant: "
+cargo run --release --example rwkv -- --quantized --which "g1-1b5" --prompt "User: 给我讲个笑话。\n\nAssistant: "
 ```
 
 ## 🛠️ 进阶用法：本地模型
 
-如果你喜欢自己管理模型文件（例如从 [HuggingFace](https://huggingface.co/BlinkDL) 下载了 `.pth` 权重），我们提供了完整的转换和加载工具。
+如果你喜欢自己管理模型文件（例如从 [魔搭社区](https://modelscope.cn/organization/RWKV) 下载了 `.pth` 权重），我们提供了完整的转换和加载工具。
 
 ### 模型转换
 首先，需要将 PyTorch 的权重 (`.pth`) 转换为 Rust 原生支持的 SafeTensors 格式，加载速度更快。

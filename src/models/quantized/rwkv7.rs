@@ -82,25 +82,61 @@ impl SelfAttention {
             .get((1, 1, cfg.hidden_size), "w0")?
             .dequantize(vb.device())?;
         let w1 = vb
-            .get((cfg.hidden_size, 64), "w1")?
+            .get(
+                (
+                    cfg.hidden_size,
+                    if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                ),
+                "w1",
+            )?
             .dequantize(vb.device())?;
         let w2 = vb
-            .get((64, cfg.hidden_size), "w2")?
+            .get(
+                (
+                    if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                    cfg.hidden_size,
+                ),
+                "w2",
+            )?
             .dequantize(vb.device())?;
         let a0 = vb
             .get((1, 1, cfg.hidden_size), "a0")?
             .dequantize(vb.device())?;
         let a1 = vb
-            .get((cfg.hidden_size, 64), "a1")?
+            .get(
+                (
+                    cfg.hidden_size,
+                    if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                ),
+                "a1",
+            )?
             .dequantize(vb.device())?;
         let a2 = vb
-            .get((64, cfg.hidden_size), "a2")?
+            .get(
+                (
+                    if cfg.hidden_size >= 2048 { 96 } else { 64 },
+                    cfg.hidden_size,
+                ),
+                "a2",
+            )?
             .dequantize(vb.device())?;
         let g1 = vb
-            .get((cfg.hidden_size, 128), "g1")?
+            .get(
+                (
+                    cfg.hidden_size,
+                    if cfg.hidden_size >= 2048 { 256 } else { 128 },
+                ),
+                "g1",
+            )?
             .dequantize(vb.device())?;
         let g2 = vb
-            .get((128, cfg.hidden_size), "g2")?
+            .get(
+                (
+                    if cfg.hidden_size >= 2048 { 256 } else { 128 },
+                    cfg.hidden_size,
+                ),
+                "g2",
+            )?
             .dequantize(vb.device())?;
 
         let v0 = if layer_id == 0 {
@@ -115,16 +151,28 @@ impl SelfAttention {
             None
         } else {
             Some(
-                vb.get((cfg.hidden_size, 32), "v1")?
-                    .dequantize(vb.device())?,
+                vb.get(
+                    (
+                        cfg.hidden_size,
+                        if cfg.hidden_size >= 2048 { 64 } else { 32 },
+                    ),
+                    "v1",
+                )?
+                .dequantize(vb.device())?,
             )
         };
         let v2 = if layer_id == 0 {
             None
         } else {
             Some(
-                vb.get((32, cfg.hidden_size), "v2")?
-                    .dequantize(vb.device())?,
+                vb.get(
+                    (
+                        if cfg.hidden_size >= 2048 { 64 } else { 32 },
+                        cfg.hidden_size,
+                    ),
+                    "v2",
+                )?
+                .dequantize(vb.device())?,
             )
         };
 
